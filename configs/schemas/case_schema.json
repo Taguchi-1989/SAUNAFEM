@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SaunaFlow Case Definition",
+  "description": "YAML/JSON schema for sauna CFD case configuration",
+  "type": "object",
+  "required": ["case", "geometry", "boundary_conditions", "solver"],
+  "properties": {
+    "case": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique case identifier"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["steady", "transient"],
+          "default": "steady"
+        }
+      },
+      "additionalProperties": false
+    },
+    "geometry": {
+      "type": "object",
+      "required": ["dimensions"],
+      "properties": {
+        "dimensions": {
+          "type": "object",
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "type": "number", "exclusiveMinimum": 0 },
+            "y": { "type": "number", "exclusiveMinimum": 0 },
+            "z": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "mesh_level": {
+          "type": "string",
+          "enum": ["M0", "M1", "M2", "M3"],
+          "default": "M0",
+          "description": "M0=2D coarse, M1=simple 3D, M2=PoC, M3=fine"
+        }
+      },
+      "additionalProperties": false
+    },
+    "boundary_conditions": {
+      "type": "object",
+      "properties": {
+        "walls": {
+          "type": "object",
+          "properties": {
+            "temperature": { "type": "number" },
+            "type": { "type": "string", "enum": ["fixed", "adiabatic", "mixed"] }
+          }
+        },
+        "heater": {
+          "type": "object",
+          "properties": {
+            "power_kw": { "type": "number", "exclusiveMinimum": 0 },
+            "position": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "z": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["buoyantSimpleFoam", "buoyantPimpleFoam"],
+          "description": "OpenFOAM solver to use"
+        },
+        "end_time": { "type": "number", "exclusiveMinimum": 0 },
+        "write_interval": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "position"],
+        "properties": {
+          "name": { "type": "string" },
+          "position": {
+            "type": "object",
+            "required": ["x", "y", "z"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "z": { "type": "number" }
+            },
+            "additionalProperties": false
+          },
+          "fields": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": ["T"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

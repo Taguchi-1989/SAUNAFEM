@@ -1,0 +1,38 @@
+case:
+  name: dry_sauna_steady
+  description: "Dry sauna steady-state baseline — temperature stratification"
+  type: steady
+
+geometry:
+  dimensions:
+    x: 3.0
+    y: 2.5
+    z: 2.5
+  mesh_level: M0
+
+boundary_conditions:
+  walls:
+    temperature: 293.15
+    type: mixed
+  heater:
+    power_kw: 9.0
+    position:
+      x: 0.5
+      y: 0.1
+      z: 1.25
+
+solver:
+  name: buoyantSimpleFoam
+  end_time: 1000
+  write_interval: 100
+
+probes:
+  - name: upper_bench
+    position: { x: 1.5, y: 2.0, z: 1.25 }
+    fields: [T]
+  - name: lower_bench
+    position: { x: 1.5, y: 0.8, z: 1.25 }
+    fields: [T]
+  - name: floor_level
+    position: { x: 1.5, y: 0.1, z: 1.25 }
+    fields: [T]
