@@ -40,9 +40,12 @@ def load_experimental_csv(csv_path: Path) -> dict[str, np.ndarray]:
     Returns dict mapping probe_name -> array of values.
     """
     data = np.genfromtxt(csv_path, delimiter=",", names=True, encoding="utf-8")
+    if data.dtype.names is None:
+        return {}
+    data = np.atleast_1d(data)
     result = {}
     for name in data.dtype.names:
-        result[name] = data[name]
+        result[name] = np.asarray(data[name], dtype=float)
     return result
 
 
@@ -71,6 +74,7 @@ def compare_probes(
     exp_values: dict[str, float],
     tolerances: dict[str, float] | None = None,
     default_tol: float = 5.0,
+    case_name: str = "unknown",
 ) -> ValidationReport:
     """Compare simulation probe values against experimental data.
 
@@ -109,7 +113,7 @@ def compare_probes(
 
     if not points:
         return ValidationReport(
-            case_name="unknown",
+            case_name=case_name,
             points=[],
             overall_pass=False,
             mean_abs_error=0.0,
@@ -118,7 +122,7 @@ def compare_probes(
 
     errors = [abs(p.error) for p in points]
     return ValidationReport(
-        case_name="",
+        case_name=case_name,
         points=points,
         overall_pass=all(p.within_tol for p in points),
         mean_abs_error=round(float(np.mean(errors)), 3),

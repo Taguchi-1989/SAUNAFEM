@@ -79,9 +79,11 @@ def run(case_dir: str, mesh_only: bool, solver: str, timeout: int) -> None:
 @click.argument("case_yaml", type=click.Path(exists=True))
 def report(case_dir: str, case_yaml: str) -> None:
     """Generate KPI report from solver results and case definition."""
-    from harness.kpi import evaluate_phase1_kpis
+    from harness.kpi import evaluate_all_kpis
     from harness.probe_parser import get_steady_state_values, parse_probe_file
+    from harness.reporting import report_to_json, report_to_markdown
     from harness.schema import load_yaml
+    from harness.validation import compare_probes, load_experimental_csv, time_average
 
     case_path = Path(case_dir)
     data = load_yaml(case_yaml)
@@ -100,11 +102,76 @@ def report(case_dir: str, case_yaml: str) -> None:
     for name, val in values.items():
         click.echo(f"  {name}: {val:.2f} K")
 
-    kpis = evaluate_phase1_kpis(values)
+    time_series: list[float] | None = None
+    t_upper_series: list[float] | None = None
+    humidity_series: list[float] | None = None
+
+    if probe_file.exists():
+        probe_data = parse_probe_file(probe_file, probe_names)
+        if probe_data:
+            time_series = probe_data[0].times
+            t_upper_series = next(
+                (pd.values for pd in probe_data if pd.probe_name == "upper_bench"),
+                None,
+            )
+
+    humidity_file = case_path / "postProcessing" / "probes" / "0" / "H2O"
+    if humidity_file.exists():
+        humidity_probe_data = parse_probe_file(humidity_file, probe_names)
+        humidity_series = next(
+            (pd.values for pd in humidity_probe_data if pd.probe_name == "upper_bench"),
+            None,
+        )
+
+    baseline_temp = values.get("upper_bench", 0.0)
+    if t_upper_series:
+        baseline_temp = t_upper_series[0]
+
+    beta_aug = data.get("aufguss", {}).get("beta_aug", 0.0)
+    perceived_temp_c = max(values.get("upper_bench", 273.15) - 273.15, 0.0)
+    kpis = evaluate_all_kpis(
+        probe_values=values,
+        t_upper_series=t_upper_series,
+        humidity_series=humidity_series,
+        time_series=time_series,
+        baseline_temp=baseline_temp,
+        event_time=float(data.get("loyly", {}).get("time", 0.0)),
+        beta_aug=beta_aug,
+        perceived_temp_c=perceived_temp_c,
+    )
     click.echo("\nKPI Results:")
     for kpi in kpis:
         status = f" [{kpi.pass_fail}]" if kpi.pass_fail else ""
         click.echo(f"  {kpi.kpi_id} {kpi.name}: {kpi.value} {kpi.unit}{status}")
+
+    exp_csv = data.get("validation", {}).get("experimental_csv")
+    if not exp_csv:
+        return
+
+    csv_path = Path(exp_csv)
+    if not csv_path.is_absolute():
+        csv_path = Path(case_yaml).resolve().parent / csv_path
+    if not csv_path.exists():
+        click.echo(f"\nWARNING: Experimental CSV not found: {csv_path}", err=True)
+        return
+
+    exp_data = load_experimental_csv(csv_path)
+    exp_values: dict[str, float] = {}
+    exp_times = exp_data.get("time")
+    for name in probe_names:
+        if name in exp_data:
+            exp_values[name] = time_average(exp_data[name], exp_times) if exp_times is not None else float(exp_data[name][-1])
+
+    report_obj = compare_probes(values, exp_values, case_name=data["case"]["name"])
+    validation_dir = case_path / "validation"
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    md_path = validation_dir / "report.md"
+    json_path = validation_dir / "report.json"
+    report_to_markdown(report_obj, md_path)
+    report_to_json(report_obj, json_path)
+    click.echo(f"\nValidation: {'PASS' if report_obj.overall_pass else 'FAIL'}")
+    click.echo(f"  Markdown: {md_path}")
+    click.echo(f"  JSON: {json_path}")
 
 
 if __name__ == "__main__":

@@ -52,12 +52,12 @@ def compute_k07(upper_temp: float, lower_temp: float) -> KPIResult:
 def compute_k02(
     t_upper_series: list[float] | np.ndarray, baseline_temp: float
 ) -> KPIResult:
-    """K-02: Post-löyly peak temperature rise above baseline [K]."""
+    """K-02: Post-Löyly peak temperature rise above baseline [K]."""
     peak = max(t_upper_series) if len(t_upper_series) > 0 else baseline_temp
     rise = peak - baseline_temp
     return KPIResult(
         kpi_id="K-02",
-        name="Post-löyly peak temperature rise",
+        name="Post-Löyly peak temperature rise",
         value=round(rise, 2),
         unit="K",
         pass_fail="pass" if rise > 0.5 else "fail",
@@ -65,12 +65,12 @@ def compute_k02(
 
 
 def compute_k03(humidity_series: list[float] | np.ndarray) -> KPIResult:
-    """K-03: Post-löyly peak absolute humidity [g/kg]."""
+    """K-03: Post-Löyly peak absolute humidity [g/kg]."""
     peak_kg = max(humidity_series) if len(humidity_series) > 0 else 0.0
     peak_gkg = peak_kg * 1000  # convert to g/kg for readability
     return KPIResult(
         kpi_id="K-03",
-        name="Post-löyly peak humidity",
+        name="Post-Löyly peak humidity",
         value=round(peak_gkg, 2),
         unit="g/kg",
         pass_fail=None,
@@ -82,7 +82,7 @@ def compute_k04(
     t_upper_series: list[float] | np.ndarray,
     event_time: float = 0.0,
 ) -> KPIResult:
-    """K-04: Time from event (löyly) to peak temperature [s]."""
+    """K-04: Time from event (Löyly) to peak temperature [s]."""
     if len(t_upper_series) == 0 or len(time_series) == 0:
         return KPIResult(
             kpi_id="K-04",

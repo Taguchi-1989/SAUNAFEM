@@ -5,7 +5,6 @@ Run with: streamlit run ui/app.py
 
 from __future__ import annotations
 
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -18,8 +17,8 @@ import numpy as np
 import streamlit as st
 import yaml
 
-from harness.kpi import evaluate_phase1_kpis
-from harness.simple_solver import solve_two_zone
+from harness.kpi import evaluate_all_kpis
+from harness.simple_solver import solve_transient, solve_two_zone
 
 st.set_page_config(page_title="SaunaFlow", page_icon="♨", layout="wide")
 
@@ -130,7 +129,14 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encodin
     tmp_yaml = Path(f.name)
 
 try:
-    result = solve_two_zone(tmp_yaml, n_profile=80, max_iter=10000)
+    transient_result = None
+    if loyly_enabled or aufguss_enabled:
+        transient_result = solve_transient(
+            tmp_yaml, n_profile=80, end_time=120.0, physical_dt=0.5, record_interval=1.0
+        )
+        result = transient_result.steady_result
+    else:
+        result = solve_two_zone(tmp_yaml, n_profile=80, max_iter=10000)
 finally:
     tmp_yaml.unlink(missing_ok=True)
 
@@ -632,7 +638,16 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("KPI Results")
-    kpis = evaluate_phase1_kpis(result.probe_values)
+    kpis = evaluate_all_kpis(
+        probe_values=result.probe_values,
+        t_upper_series=transient_result.t_upper_series if transient_result else None,
+        humidity_series=transient_result.humidity_series if transient_result else None,
+        time_series=transient_result.time if transient_result else None,
+        baseline_temp=float(transient_result.t_upper_series[0]) if transient_result else 0.0,
+        event_time=0.0,
+        beta_aug=result.beta_aug_applied,
+        perceived_temp_c=result.perceived_temp_upper,
+    )
     for kpi in kpis:
         if kpi.pass_fail == "pass":
             st.success(f"**{kpi.kpi_id}**: {kpi.name}")

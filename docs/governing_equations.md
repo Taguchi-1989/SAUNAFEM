@@ -700,11 +700,76 @@ PoC フェーズに適している。
 
 ---
 
-## 付録: フェーズ別の方程式拡張予定
+## 付録 A: フェーズ別の実装状況
 
-| フェーズ | OpenFOAM | 簡易版 | 備考 |
+| フェーズ | OpenFOAM | 簡易版 | 状態 |
 |---------|----------|--------|------|
-| Phase 1 (現在) | buoyantPimpleFoam + SST k-omega, pureMixture | 2-Zone プルームモデル | 温度成層の再現 |
-| Phase 2 (löyly) | multiComponentMixture + 蒸気輸送 ($Y$) + fvDOM/viewFactor 輻射 | 蒸気体積膨張項 $\dot{V}_{\text{steam}}$ + 蒸発潜熱 $Q_{\text{steam}}$ + 形態係数輻射 | 組成浮力・ピストン効果・輻射加熱 |
-| Phase 3 (Aufguss) | 運動量ソース項 (ジェット) + 上記 Phase 2 の全モデル | ROM: 強制混合係数 $\beta_{\text{aug}}$ を CFD から抽出し適用 | ハイブリッド ROM アプローチ |
-| Phase 4-5 | 方程式追加なし | - | 実験データとの比較・自動化 |
+| Phase 1 | buoyantPimpleFoam + SST k-omega, pureMixture | 2-Zone プルームモデル (定常) | **実装済** |
+| Phase 2 | multiComponentMixture + 蒸気輸送 ($Y$) + H2O テンプレート | 蒸気体積膨張 $\dot{V}_{\text{steam}}$ + 蒸発潜熱 $Q_{\text{steam}}$ + 形態係数輻射 + 壁面昇温モデル + 湿度連成物性 + 非定常ソルバー (`solve_transient`) | **実装済** |
+| Phase 3 | 運動量ソース項 (ジェット) — 未実装 | ROM: 強制混合係数 $\beta_{\text{aug}}$ + 抽出スクリプト (`extract_beta_aug.py`) | **枠組み実装済** |
+| Phase 4-5 | — | CSV 取込 (`validation.py`) + プローブ比較 (`compare_probes`) + レポート生成 (`reporting.py`) | **枠組み実装済** |
+
+## 付録 B: KPI 一覧と実装状況
+
+| KPI ID | 名称 | 入力 | 実装 |
+| ------ | ---- | ---- | ---- |
+| K-01 | 定常温度差 (上段-下段) | プローブ定常値 | **済** (`kpi.py`) |
+| K-02 | Löyly 後ピーク温度上昇 | 時系列 $T_{\text{upper}}(t)$ | **済** |
+| K-03 | Löyly 後ピーク絶対湿度 | 時系列 $w(t)$ | **済** |
+| K-04 | ピーク到達時間 | 時系列 $T_{\text{upper}}(t)$ + イベント時刻 | **済** |
+| K-05 | 顔面風速ピーク (proxy) | $\beta_{\text{aug}}$ から推定 | **済** (ROM proxy) |
+| K-06 | 簡易熱ストレス指標 | 体感温度 (乾球+湿度補正) | **済** |
+| K-07 | 上下相対温度差 | プローブ定常値 | **済** (`kpi.py`) |
+
+## 付録 C: 簡易版の追加モデル (Phase 2 実装分)
+
+### 壁面集中定数モデル (lumped wall)
+
+壁面内面温度 $T_{\text{wall,inner}}$ を状態変数として追加:
+
+$$
+(\rho c_p)_w \, \delta_w \, A_{\text{wall}} \, \frac{dT_{\text{wall,inner}}}{dt}
+= \underbrace{Q_{\text{conv→wall}}}_{\text{空気→壁面対流}}
++ \underbrace{Q_{\text{rad→wall}}}_{\text{ヒーター輻射}}
+- \underbrace{\frac{\lambda_w}{\delta_w} A_{\text{wall}} (T_{\text{wall,inner}} - T_{\text{wall,outer}})}_{\text{壁面→外部熱伝導}}
+$$
+
+パラメータ:
+
+- $\delta_w = 0.015$ m (木製パネル厚さ)
+- $\lambda_w = 0.12$ W/(m·K) (木の熱伝導率)
+- $(\rho c_p)_w = 5 \times 10^5$ J/(m³·K) (木の体積熱容量)
+
+`model: fixed` で従来の固定壁温、`model: lumped` で昇温モデルを選択。
+
+### 湿度連成物性モデル
+
+混合気体の物性を湿度比 $w$ [kg/kg] に応じて補正:
+
+$$
+c_{p,\text{mix}} = (1 - y_v) \, c_{p,\text{air}} + y_v \, c_{p,\text{vapor}}
+$$
+
+$$
+h_{\text{wall,eff}} = h_{\text{wall,base}} \left(\frac{c_{p,\text{mix}}}{c_{p,\text{air}}}\right)^{0.25} \left(\frac{\lambda_{\text{mix}}}{\lambda_{\text{air}}}\right)^{0.75}
+$$
+
+ここで $y_v = w / (1+w)$ は蒸気質量分率。
+
+### 体感温度 (Steadman 近似)
+
+$$
+T_{\text{perceived}} \approx T_{\text{dry}} + 0.33 \left(\frac{RH \cdot p_{\text{sat}}}{1000}\right) - 4.0 \quad (T > 27°\text{C}, \; RH > 5\%)
+$$
+
+$p_{\text{sat}}$ は Antoine 式から算出。湿度が高いほど蒸発冷却が阻害され、体感温度が上昇する。
+
+### ヒーター容量の目安
+
+業界標準 (Harvia, HELO): 約 **1 kW / m³** のサウナ室体積。
+
+| 部屋サイズ | 体積 | 推奨ヒーター |
+| --------- | ---- | ----------- |
+| 2.0×1.5×2.2 m (1-2人) | 6.6 m³ | 6-8 kW |
+| 3.0×2.5×2.5 m (4-6人) | 18.8 m³ | 18-20 kW |
+| 4.0×3.0×2.5 m (商業用) | 30 m³ | 30 kW |

@@ -120,7 +120,7 @@ def run_solver(
     final_residuals = residuals[-1] if residuals else {}
 
     return SolverResult(
-        success=True,
+        success=result.returncode == 0,
         iterations=len(residuals),
         converged=converged,
         final_residuals=final_residuals,

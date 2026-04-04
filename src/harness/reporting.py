@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from harness.validation import ValidationReport
@@ -59,3 +60,13 @@ def report_to_dict(report: ValidationReport) -> dict:
             for p in report.points
         ],
     }
+
+
+def report_to_json(
+    report: ValidationReport, output_path: Path | None = None, indent: int = 2
+) -> str:
+    """Generate a JSON validation report."""
+    text = json.dumps(report_to_dict(report), indent=indent)
+    if output_path:
+        output_path.write_text(text + "\n", encoding="utf-8")
+    return text
