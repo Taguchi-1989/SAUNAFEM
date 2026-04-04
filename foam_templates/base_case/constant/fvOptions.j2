@@ -1,0 +1,58 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvOptions;
+}
+
+{% if aufguss_enabled %}
+aufgussJet
+{
+    type            vectorCodedSource;
+    active          true;
+    selectionMode   cellZone;
+    cellZone        aufgussZone;
+
+    vectorCodedSourceCoeffs
+    {
+        selectionMode   cellZone;
+        cellZone        aufgussZone;
+        fields          (U);
+
+        codeInclude
+        #{
+            #include "fvCFD.H"
+        #};
+
+        codeCorrect
+        #{
+        #};
+
+        codeAddSup
+        #{
+            // Aufguss jet: downward momentum in the aufguss zone
+            // Simulates towel waving creating a directed air jet
+            const scalar jetVelocity = {{ aufguss_jet_velocity }};  // m/s
+            const scalar jetDirection = -1.0;  // downward (y-direction)
+
+            vectorField& USource = eqn.source();
+            const scalarField& V = mesh_.V();
+
+            forAll(cells, i)
+            {
+                label cellI = cells[i];
+                // Momentum source = rho * V * acceleration
+                // Simplified as a body force in the y-direction
+                USource[cellI][1] += jetDirection * jetVelocity * V[cellI] / {{ aufguss_duration }};
+            }
+        #};
+
+        codeConstrain
+        #{
+        #};
+    }
+}
+{% else %}
+// No fvOptions active (dry sauna or loyly only)
+{% endif %}

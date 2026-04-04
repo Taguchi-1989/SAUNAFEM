@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from harness.case_builder import (
     build_case,
     compute_heater_params,
@@ -204,6 +206,9 @@ class TestMultiComponentMixture:
             "mixture_type": mixture_type,
             "Y_H2O_initial": 0.01,
             "Y_H2O_heater": 0.01,
+            "aufguss_enabled": False,
+            "aufguss_jet_velocity": 0.0,
+            "aufguss_duration": 1.0,
         }
 
     def test_pure_mixture_default(self, tmp_path: Path) -> None:
@@ -248,3 +253,72 @@ class TestMultiComponentMixture:
         thermo = (out / "constant" / "thermophysicalProperties").read_text(encoding="utf-8")
         assert "pureMixture" in thermo
         assert not (out / "0" / "H2O").exists()
+
+
+class TestAufgussTemplate:
+    """Tests for Aufguss jet momentum source fvOptions template."""
+
+    def test_fvoptions_created_with_aufguss(self, tmp_path: Path) -> None:
+        """When aufguss is present, fvOptions should contain jet source."""
+        data = {
+            "case": {
+                "name": "aufguss_test",
+                "description": "Aufguss jet test",
+                "type": "transient",
+            },
+            "geometry": {
+                "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+                "mesh_level": "M0",
+            },
+            "boundary_conditions": {
+                "walls": {
+                    "temperature": 293.15,
+                    "type": "mixed",
+                    "model": "lumped",
+                    "thickness": 0.015,
+                    "conductivity": 0.12,
+                    "rho_cp": 500000,
+                },
+                "heater": {
+                    "power_kw": 18.0,
+                    "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                    "width": 0.6,
+                    "height": 0.5,
+                },
+            },
+            "solver": {
+                "name": "buoyantPimpleFoam",
+                "end_time": 300,
+                "write_interval": 10,
+                "delta_t": 0.05,
+                "averaging_start": 150,
+            },
+            "aufguss": {
+                "beta_aug": 0.5,
+                "jet_velocity": 2.0,
+                "duration": 30.0,
+            },
+            "probes": [
+                {
+                    "name": "upper_bench",
+                    "position": {"x": 1.5, "y": 2.0, "z": 1.25},
+                    "fields": ["T"],
+                },
+            ],
+        }
+        yaml_path = tmp_path / "aufguss_case.yaml"
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+        out = tmp_path / "case_out"
+        build_case(yaml_path, output_dir=out)
+
+        fvoptions = (out / "constant" / "fvOptions").read_text(encoding="utf-8")
+        assert "aufgussJet" in fvoptions
+        assert "vectorCodedSource" in fvoptions
+
+    def test_fvoptions_empty_without_aufguss(self, sample_case_path: Path, tmp_path: Path) -> None:
+        """Without aufguss, fvOptions should be empty/inactive."""
+        out = tmp_path / "case_out"
+        build_case(sample_case_path, output_dir=out)
+        fvoptions = (out / "constant" / "fvOptions").read_text(encoding="utf-8")
+        assert "aufgussJet" not in fvoptions

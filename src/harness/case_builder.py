@@ -350,6 +350,10 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     loyly = data.get("loyly")
     mixture_type = "multiComponent" if loyly else "pure"
 
+    # Aufguss jet momentum source parameters
+    aufguss = data.get("aufguss")
+    aufguss_enabled = aufguss is not None
+
     context = {
         **mesh,
         **heater,
@@ -362,6 +366,9 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "mixture_type": mixture_type,
         "Y_H2O_initial": 0.01,
         "Y_H2O_heater": 0.01,
+        "aufguss_enabled": aufguss_enabled,
+        "aufguss_jet_velocity": aufguss.get("jet_velocity", 2.0) if aufguss_enabled else 0.0,
+        "aufguss_duration": aufguss.get("duration", 1.0) if aufguss_enabled else 1.0,
     }
 
     # Skip vapor field template for pure mixture cases
