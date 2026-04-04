@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
-
 from harness.kpi import KPIResult, evaluate_all_kpis
 from harness.simple_solver import SimpleSolverResult, solve_two_zone
 

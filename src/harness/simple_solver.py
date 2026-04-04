@@ -76,42 +76,57 @@ def _compute_view_factors(
 ) -> dict[str, float]:
     """Compute approximate view factors from heater to room surfaces.
 
-    Uses parallel-plate and perpendicular-plate analytical approximations
-    (Hottel & Sarofim, 1967) for a rectangular enclosure.
+    Uses solid-angle fractions from the heater centroid to each surface.
+    A heater near the floor radiates more downward; near the ceiling,
+    more upward. The opposite wall receives radiation based on the
+    heater's angular extent.
 
     Returns dict with keys: 'floor', 'lower_walls', 'upper_walls', 'ceiling'.
     All values sum to ~1.0 (enclosure closure rule).
     """
-    # Heater centroid height
     h_center = heater_y + heater_h / 2.0
 
-    # Approximate view factors using solid-angle fractions
-    # Floor: heater looks down at the floor
-    # Use the angle subtended by the floor from heater centroid
-    dist_to_floor = h_center
-    floor_half_angle = np.arctan(room_w / max(dist_to_floor, 0.01))
-    f_floor = floor_half_angle / np.pi  # fraction of hemisphere
+    # Vertical angle fractions from heater centroid
+    # Floor: angle subtended looking DOWN from heater
+    dist_floor = max(h_center, 0.01)
+    # Ceiling: angle subtended looking UP from heater
+    dist_ceil = max(room_h - h_center, 0.01)
 
-    # Ceiling: heater looks up at ceiling
-    dist_to_ceiling = room_h - h_center
-    ceiling_half_angle = np.arctan(room_w / max(dist_to_ceiling, 0.01))
-    f_ceiling = ceiling_half_angle / np.pi
+    # Solid-angle fraction ≈ atan(characteristic_length / distance) / pi
+    # Characteristic length for floor/ceiling is the room diagonal projected
+    char_len = np.sqrt(room_w**2 + room_d**2) / 2.0
 
-    # Opposite wall: direct view across room
-    f_opposite = np.arctan(heater_h / room_w) / np.pi
+    f_floor_raw = np.arctan(char_len / dist_floor) / np.pi
+    f_ceiling_raw = np.arctan(char_len / dist_ceil) / np.pi
 
-    # Side walls and remaining surfaces
-    f_remaining = max(0.0, 1.0 - f_floor - f_ceiling - f_opposite)
+    # Opposite wall fraction (across the room width)
+    f_opposite = np.arctan(heater_h / max(room_w, 0.01)) / np.pi
 
-    # Split into lower and upper wall portions based on heater height
-    lower_frac = h_center / room_h
-    upper_frac = 1.0 - lower_frac
+    # Remaining goes to side walls, split by position relative to heater
+    f_sum = f_floor_raw + f_ceiling_raw + f_opposite
+    if f_sum > 1.0:
+        scale = 1.0 / f_sum
+        f_floor_raw *= scale
+        f_ceiling_raw *= scale
+        f_opposite *= scale
+
+    f_sides = max(0.0, 1.0 - f_floor_raw - f_ceiling_raw - f_opposite)
+
+    # Side walls: split into lower/upper based on the heater's vertical
+    # position. Below heater → "lower walls", above → "upper walls".
+    # fraction_below = how much wall area is below heater center
+    frac_below = h_center / room_h
+    frac_above = 1.0 - frac_below
+
+    # Lower zone receives: floor + below-portion of side walls + below-portion of opposite
+    f_lower_walls = f_sides * frac_below + f_opposite * frac_below
+    f_upper_walls = f_sides * frac_above + f_opposite * frac_above
 
     return {
-        "floor": float(np.clip(f_floor, 0.01, 0.5)),
-        "lower_walls": float(np.clip(f_remaining * lower_frac + f_opposite * lower_frac, 0.01, 0.5)),
-        "upper_walls": float(np.clip(f_remaining * upper_frac + f_opposite * upper_frac, 0.01, 0.5)),
-        "ceiling": float(np.clip(f_ceiling, 0.01, 0.5)),
+        "floor": float(np.clip(f_floor_raw, 0.01, 0.6)),
+        "lower_walls": float(np.clip(f_lower_walls, 0.01, 0.5)),
+        "upper_walls": float(np.clip(f_upper_walls, 0.01, 0.5)),
+        "ceiling": float(np.clip(f_ceiling_raw, 0.01, 0.6)),
     }
 
 
@@ -140,7 +155,7 @@ def _plume_entrainment(
         (m_dot, t_plume): Mass flow rate [kg/s] and plume temperature [K].
     """
     if z <= 0.01 or q_conv_w <= 0:
-        return 0.0, t_amb + 100.0
+        return 0.0, t_amb
 
     # Zukoski plume correlation:
     # m_dot = 0.071 * Q_c^(1/3) * z^(5/3) + 0.0018 * Q_c
@@ -429,10 +444,13 @@ def solve_two_zone(
     total_steam = 0.0
     peak_steam_rate = 0.0
     pseudo_time = 0.0
+    steam_applied = False
 
     for iteration in range(max_iter):
         t_upper_old = t_upper
+        t_lower_old = t_lower
         z_int_old = z_int
+        t_wall_inner_old = t_wall_inner
 
         # Layer volumes
         v_upper = a_floor * (height - z_int)
@@ -470,23 +488,22 @@ def solve_two_zone(
         dt_upper = (q_plume_in - q_wall_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
         t_upper += dt * dt_upper
 
-        # Steam injection (löyly)
-        if water_kg > 0 and pseudo_time >= loyly_time:
-            elapsed = pseudo_time - loyly_time
-            m_dot_steam = _evaporation_rate(water_kg, elapsed, tau_evap)
-            peak_steam_rate = max(peak_steam_rate, m_dot_steam)
-            total_steam += m_dot_steam * dt
+        # Steam injection (löyly) — steady-state treatment
+        # In the steady-state solver, we model the FINAL state after all water
+        # has evaporated. The latent heat and humidity are computed from total
+        # water mass, not from a transient evaporation rate.
+        if water_kg > 0 and not steam_applied:
+            # Apply all steam energy and humidity once, early in the iteration
+            if iteration == 50:  # after initial transients settle
+                q_steam_total = water_kg * L_VAPORIZATION
+                t_upper += q_steam_total / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
+                humidity_ratio = water_kg / max(m_upper, 0.1)
+                total_steam = water_kg
+                peak_steam_rate = water_kg / tau_evap  # peak instantaneous rate
+                steam_applied = True
 
-            # Latent heat adds energy to upper layer
-            q_steam = m_dot_steam * L_VAPORIZATION
-            t_upper += dt * q_steam / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
-
-            # Update humidity ratio (vapor added to upper layer air mass)
-            if m_upper > 0.1:
-                humidity_ratio += m_dot_steam * dt / m_upper
-
-            # Steam volume expansion pushes interface down
-            v_steam = m_dot_steam * R_GAS * t_upper / (P_ATM * MW_STEAM)
+            v_steam = 0.0  # no ongoing volume expansion at steady state
+            m_dot_steam = 0.0
         else:
             m_dot_steam = 0.0
             v_steam = 0.0
@@ -530,15 +547,17 @@ def solve_two_zone(
         # Wall absorbs heat from air (convection) and heater (radiation)
         # Wall loses heat to outside through conduction
         if wall_cfg == "lumped" and wall_mass_cp > 0:
-            q_to_wall = (q_wall_upper + q_wall_lower)  # heat from air to wall
-            q_rad_wall = q_rad_to_walls * (1.0 - f_rad_lower)  # radiation to upper walls
+            q_to_wall = (q_wall_upper + q_wall_lower)
+            # ALL heater radiation eventually heats the walls (upper + lower portions)
+            q_rad_wall = q_rad_to_walls
             q_out = wall_lambda / wall_thickness * a_wall_total * (t_wall_inner - t_wall)
             dt_wall = (q_to_wall + q_rad_wall - q_out) / wall_mass_cp
             t_wall_inner += dt * dt_wall
             t_wall_inner = np.clip(t_wall_inner, t_wall, t_wall + 200)
 
         # Aufguss forced mixing (ROM: transfers heat from upper to lower)
-        if beta_aug > 0 and aufguss_start <= pseudo_time <= aufguss_start + aufguss_duration:
+        # In steady-state solver, aufguss is always active (no physical time)
+        if beta_aug > 0:
             q_mix = beta_aug * cp * (t_upper - t_lower)
             if m_upper > 0.1:
                 t_upper -= dt * q_mix / (m_upper * cp)
@@ -547,10 +566,12 @@ def solve_two_zone(
             t_upper = np.clip(t_upper, t_wall_inner, t_wall_inner + 200)
             t_lower = np.clip(t_lower, t_wall - 1, t_upper)
 
-        # Convergence check
-        res_t = abs(t_upper - t_upper_old)
+        # Convergence check (all state variables)
+        res_t_upper = abs(t_upper - t_upper_old)
+        res_t_lower = abs(t_lower - t_lower_old)
         res_z = abs(z_int - z_int_old)
-        residual = max(res_t, res_z * 10)  # scale z residual
+        res_wall = abs(t_wall_inner - t_wall_inner_old) if wall_cfg == "lumped" else 0.0
+        residual = max(res_t_upper, res_t_lower, res_z * 10, res_wall)
         residual_history.append(residual)
 
         if residual < tol and iteration > 100:
@@ -559,9 +580,6 @@ def solve_two_zone(
         pseudo_time += dt
 
     total_steam = min(total_steam, water_kg) if water_kg > 0 else 0.0
-    beta_aug_applied = beta_aug if (
-        beta_aug > 0 and aufguss_start <= pseudo_time <= aufguss_start + aufguss_duration
-    ) else 0.0
 
     return _make_simple_result(
         data=data,
@@ -579,7 +597,7 @@ def solve_two_zone(
         residual_history=residual_history,
         peak_steam_rate=peak_steam_rate,
         total_steam=total_steam,
-        beta_aug_applied=beta_aug_applied,
+        beta_aug_applied=beta_aug,
         t_wall_inner=t_wall_inner,
         humidity_ratio=humidity_ratio,
     )

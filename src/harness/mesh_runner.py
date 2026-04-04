@@ -76,7 +76,7 @@ def run_mesh(case_dir: Path, check: bool = True) -> MeshResult:
 
     return MeshResult(
         cell_count=cell_count,
-        success=True,
+        success=result.returncode == 0 and (not check or check_result.returncode == 0),
         log=log,
         quality=quality,
     )

@@ -59,10 +59,10 @@ def _write_case_yaml(tmp_path: Path, **overrides) -> Path:
 
 
 class TestPlumeEntrainment:
-    def test_zero_height_returns_high_temp(self) -> None:
+    def test_zero_height_returns_ambient(self) -> None:
         m, t = _plume_entrainment(9000.0, 0.0, 293.15)
         assert m == 0.0
-        assert t > 350.0
+        assert t == 293.15  # no plume at zero height = ambient
 
     def test_mass_flow_increases_with_height(self) -> None:
         m1, _ = _plume_entrainment(9000.0, 1.0, 293.15)
