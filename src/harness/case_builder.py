@@ -318,12 +318,26 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     solver = data["solver"]
     probes = _build_probe_context(data.get("probes", []))
 
+    solver_name = solver["name"]
+    end_time = solver.get("end_time", 1000)
+    write_interval = solver.get("write_interval", 100)
+
+    # Transient solver parameters
+    if solver_name == "buoyantPimpleFoam":
+        delta_t = solver.get("delta_t", 0.1)
+        averaging_start = solver.get("averaging_start", end_time * 0.5)
+    else:
+        delta_t = 1
+        averaging_start = 0
+
     context = {
         **mesh,
         **heater,
-        "solver_name": solver["name"],
-        "end_time": solver.get("end_time", 1000),
-        "write_interval": solver.get("write_interval", 100),
+        "solver_name": solver_name,
+        "end_time": end_time,
+        "write_interval": write_interval,
+        "delta_t": delta_t,
+        "averaging_start": averaging_start,
         "probes": probes,
     }
 

@@ -98,7 +98,7 @@ class TestBuildCase:
 
         # Check controlDict has correct solver
         control = (out / "system" / "controlDict").read_text(encoding="utf-8")
-        assert "buoyantSimpleFoam" in control
+        assert "buoyantPimpleFoam" in control
 
         # Check T file has heat flux
         t_file = (out / "0" / "T").read_text(encoding="utf-8")

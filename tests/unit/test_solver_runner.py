@@ -42,7 +42,7 @@ smoothSolver:  Solving for Uz, Initial residual = 1e-05, Final residual = 1e-07,
 GAMG:  Solving for p_rgh, Initial residual = 1e-05, Final residual = 1e-07, No Iterations 3
 smoothSolver:  Solving for T, Initial residual = 1e-06, Final residual = 1e-08, No Iterations 3
 smoothSolver:  Solving for k, Initial residual = 1e-05, Final residual = 1e-07, No Iterations 3
-smoothSolver:  Solving for epsilon, Initial residual = 1e-05, Final residual = 1e-07, No Iterations 3
+smoothSolver:  Solving for omega, Initial residual = 1e-05, Final residual = 1e-07, No Iterations 3
 
 End
 """
@@ -68,7 +68,10 @@ class TestParseResiduals:
         assert parse_residuals("") == []
 
     def test_partial_log(self) -> None:
-        partial = "smoothSolver:  Solving for Ux, Initial residual = 0.5, Final residual = 0.05, No Iterations 2\n"
+        partial = (
+            "smoothSolver:  Solving for Ux, Initial residual = 0.5,"
+            " Final residual = 0.05, No Iterations 2\n"
+        )
         residuals = parse_residuals(partial)
         assert len(residuals) == 1
         assert residuals[0]["Ux"] == 0.05

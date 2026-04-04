@@ -105,7 +105,17 @@
           "description": "OpenFOAM solver to use"
         },
         "end_time": { "type": "number", "exclusiveMinimum": 0 },
-        "write_interval": { "type": "number", "exclusiveMinimum": 0 }
+        "write_interval": { "type": "number", "exclusiveMinimum": 0 },
+        "delta_t": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Time step for transient solvers [s]"
+        },
+        "averaging_start": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Start time for field averaging [s]"
+        }
       },
       "additionalProperties": false
     },

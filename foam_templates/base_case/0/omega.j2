@@ -3,18 +3,18 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volScalarField;
-    object      epsilon;
+    object      omega;
 }
 
-dimensions      [0 2 -3 0 0 0 0];
+dimensions      [0 0 -1 0 0 0 0];
 
-internalField   uniform 0.01;
+internalField   uniform 5.0;
 
 boundaryField
 {
     "(floor|ceiling|heater_wall|heater_wall_surround|opposite_wall|front|back)"
     {
-        type            epsilonWallFunction;
-        value           uniform 0.01;
+        type            omegaWallFunction;
+        value           uniform 5.0;
     }
 }

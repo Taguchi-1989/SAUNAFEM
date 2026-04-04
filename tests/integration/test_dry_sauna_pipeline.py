@@ -34,7 +34,7 @@ smoothSolver:  Solving for Uz, Initial residual = 1e-05, Final residual = 1e-07,
 GAMG:  Solving for p_rgh, Initial residual = 5e-05, Final residual = 3e-07, No Iterations 4
 smoothSolver:  Solving for T, Initial residual = 8e-06, Final residual = 5e-08, No Iterations 3
 smoothSolver:  Solving for k, Initial residual = 3e-05, Final residual = 2e-07, No Iterations 3
-smoothSolver:  Solving for epsilon, Initial residual = 4e-05, Final residual = 3e-07, No Iterations 3
+smoothSolver:  Solving for omega, Initial residual = 4e-05, Final residual = 3e-07, No Iterations 3
 
 End
 """

@@ -16,13 +16,13 @@ stopAt          endTime;
 
 endTime         {{ end_time }};
 
-deltaT          1;
+deltaT          {{ delta_t }};
 
-writeControl    timeStep;
+writeControl    adjustableRunTime;
 
 writeInterval   {{ write_interval }};
 
-purgeWrite      3;
+purgeWrite      5;
 
 writeFormat     ascii;
 
@@ -36,14 +36,21 @@ timePrecision   6;
 
 runTimeModifiable true;
 
+{% if solver_name == "buoyantPimpleFoam" %}
+adjustTimeStep  yes;
+
+maxCo           0.5;
+
+maxDeltaT       {{ delta_t }};
+{% endif %}
+
 functions
 {
     probes
     {
         type            probes;
         libs            (sampling);
-        writeControl    timeStep;
-        writeInterval   {{ write_interval }};
+        writeControl    writeTime;
         probeLocations
         (
 {% for probe in probes %}
@@ -54,6 +61,29 @@ functions
         (
             T
             U
+        );
+    }
+
+    fieldAverage
+    {
+        type            fieldAverage;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        timeStart       {{ averaging_start }};
+        fields
+        (
+            T
+            {
+                mean        on;
+                prime2Mean  on;
+                base        time;
+            }
+            U
+            {
+                mean        on;
+                prime2Mean  on;
+                base        time;
+            }
         );
     }
 }

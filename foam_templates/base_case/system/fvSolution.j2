@@ -16,15 +16,56 @@ solvers
         smoother        GaussSeidel;
     }
 
-    "(U|T|k|epsilon)"
+    p_rghFinal
     {
-        solver          smoothSolver;
-        smoother        symGaussSeidel;
+        $p_rgh;
+        relTol          0;
+    }
+
+    "(U|T|k|omega|epsilon)"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
         tolerance       1e-7;
         relTol          0.1;
     }
+
+    "(U|T|k|omega|epsilon)Final"
+    {
+        $U;
+        relTol          0;
+    }
 }
 
+{% if solver_name == "buoyantPimpleFoam" %}
+PIMPLE
+{
+    nOuterCorrectors    2;
+    nCorrectors         1;
+    nNonOrthogonalCorrectors 0;
+    pRefCell            0;
+    pRefValue           0;
+
+    residualControl
+    {
+        p_rgh
+        {
+            relTol          0;
+            tolerance       1e-4;
+        }
+        U
+        {
+            relTol          0;
+            tolerance       1e-4;
+        }
+        T
+        {
+            relTol          0;
+            tolerance       1e-5;
+        }
+    }
+}
+{% else %}
 SIMPLE
 {
     nNonOrthogonalCorrectors 0;
@@ -36,9 +77,10 @@ SIMPLE
         p_rgh           1e-4;
         U               1e-4;
         T               1e-5;
-        "(k|epsilon)"   1e-4;
+        "(k|omega|epsilon)" 1e-4;
     }
 }
+{% endif %}
 
 relaxationFactors
 {
@@ -51,6 +93,7 @@ relaxationFactors
         U               0.7;
         T               0.5;
         k               0.7;
+        omega           0.7;
         epsilon         0.7;
     }
 }

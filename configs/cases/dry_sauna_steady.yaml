@@ -24,9 +24,11 @@ boundary_conditions:
     height: 0.5
 
 solver:
-  name: buoyantSimpleFoam
-  end_time: 1000
-  write_interval: 100
+  name: buoyantPimpleFoam
+  end_time: 300
+  write_interval: 10
+  delta_t: 0.05
+  averaging_start: 150
 
 probes:
   - name: upper_bench
