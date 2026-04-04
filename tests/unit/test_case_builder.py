@@ -104,7 +104,7 @@ class TestBuildCase:
         # Check T file has heat flux
         t_file = (out / "0" / "T").read_text(encoding="utf-8")
         assert "externalWallHeatFluxTemperature" in t_file
-        assert "30000.0" in t_file  # 9000/(0.6*0.5)
+        assert "60000.0" in t_file  # 18000/(0.6*0.5)
         assert "heater_wall_surround" in t_file
 
     def test_probes_in_controldict(self, sample_case_path: Path, tmp_path: Path) -> None:

@@ -15,11 +15,11 @@ boundary_conditions:
     temperature: 293.15
     type: mixed
     model: lumped
-    thickness: 0.02
+    thickness: 0.015
     conductivity: 0.12
-    rho_cp: 400000
+    rho_cp: 500000
   heater:
-    power_kw: 9.0
+    power_kw: 18.0
     position:
       x: 0.0
       y: 0.1
