@@ -8,6 +8,7 @@ from harness.case_builder import (
     build_case,
     compute_heater_params,
     compute_mesh_params,
+    render_templates,
 )
 
 
@@ -158,3 +159,92 @@ class TestBuildCase:
         # Build again — should not fail
         build_case(sample_case_path, output_dir=out)
         assert (out / "system" / "blockMeshDict").is_file()
+
+
+class TestMultiComponentMixture:
+    """Tests for multi-component mixture (air + H2O) support."""
+
+    _TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "foam_templates" / "base_case"
+
+    def _minimal_context(self, mixture_type: str = "pure") -> dict:
+        """Build a minimal context dict for template rendering."""
+        return {
+            "dim_x": 3.0,
+            "dim_y": 2.5,
+            "dim_z": 2.5,
+            "nx": 24,
+            "ny": 20,
+            "nz": 20,
+            "heater_area": 0.3,
+            "heater_y0": 0.1,
+            "heater_y1": 0.6,
+            "heater_z0": 0.95,
+            "heater_z1": 1.55,
+            "vertices": [(0, 0, 0), (3, 0, 0), (3, 2.5, 0), (0, 2.5, 0),
+                         (0, 0, 2.5), (3, 0, 2.5), (3, 2.5, 2.5), (0, 2.5, 2.5)],
+            "blocks": [{"vertices": (0, 1, 2, 3, 4, 5, 6, 7), "cells": (24, 20, 20)}],
+            "floor_faces": [(0, 1, 5, 4)],
+            "ceiling_faces": [(3, 7, 6, 2)],
+            "heater_faces": [(0, 4, 7, 3)],
+            "heater_surround_faces": [],
+            "opposite_faces": [(1, 2, 6, 5)],
+            "front_faces": [(0, 3, 2, 1)],
+            "back_faces": [(4, 5, 6, 7)],
+            "heat_flux": 30000.0,
+            "heater_width": 0.6,
+            "heater_height": 0.5,
+            "T_walls": 293.15,
+            "T_initial": 293.15,
+            "solver_name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+            "probes": [],
+            "mixture_type": mixture_type,
+            "Y_H2O_initial": 0.01,
+            "Y_H2O_heater": 0.01,
+        }
+
+    def test_pure_mixture_default(self, tmp_path: Path) -> None:
+        """Default (no loyly) produces pureMixture in thermophysicalProperties."""
+        ctx = self._minimal_context("pure")
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        thermo = (tmp_path / "constant" / "thermophysicalProperties").read_text(encoding="utf-8")
+        assert "pureMixture" in thermo
+        assert "multiComponentMixture" not in thermo
+
+    def test_multi_component_when_loyly(self, tmp_path: Path) -> None:
+        """When mixture_type is multiComponent, output contains multiComponentMixture."""
+        ctx = self._minimal_context("multiComponent")
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx)
+        thermo = (tmp_path / "constant" / "thermophysicalProperties").read_text(encoding="utf-8")
+        assert "multiComponentMixture" in thermo
+        assert "pureMixture" not in thermo
+        assert "H2O" in thermo
+        assert "inertSpecie air" in thermo
+
+    def test_y_h2o_template_rendered(self, tmp_path: Path) -> None:
+        """H2O mass fraction field is created when multi-component."""
+        ctx = self._minimal_context("multiComponent")
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx)
+        h2o_path = tmp_path / "0" / "H2O"
+        assert h2o_path.is_file()
+        content = h2o_path.read_text(encoding="utf-8")
+        assert "volScalarField" in content
+        assert "0.01" in content
+
+    def test_y_h2o_not_rendered_for_pure(self, tmp_path: Path) -> None:
+        """H2O file is NOT created for pure mixture cases."""
+        ctx = self._minimal_context("pure")
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        h2o_path = tmp_path / "0" / "H2O"
+        assert not h2o_path.exists()
+
+    def test_build_case_pure_no_h2o(self, sample_case_path: Path, tmp_path: Path) -> None:
+        """Full build_case with no loyly key produces pure mixture, no H2O file."""
+        out = tmp_path / "test_case"
+        build_case(sample_case_path, output_dir=out)
+        thermo = (out / "constant" / "thermophysicalProperties").read_text(encoding="utf-8")
+        assert "pureMixture" in thermo
+        assert not (out / "0" / "H2O").exists()

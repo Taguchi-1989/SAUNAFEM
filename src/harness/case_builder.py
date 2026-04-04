@@ -251,28 +251,44 @@ def _build_probe_context(probes: list[dict]) -> list[dict]:
     return result
 
 
-def render_templates(template_dir: Path, output_dir: Path, context: dict) -> None:
+def render_templates(
+    template_dir: Path,
+    output_dir: Path,
+    context: dict,
+    skip_templates: list[str] | None = None,
+) -> None:
     """Render all .j2 templates into the output directory.
 
     Walks template_dir, renders each .j2 file with Jinja2,
     and writes the result to the corresponding path in output_dir
     (stripping the .j2 extension). Non-.j2 files are copied as-is.
+
+    Args:
+        template_dir: Path to the template directory.
+        output_dir: Path to the output directory.
+        context: Template variables.
+        skip_templates: List of relative template paths to skip (e.g. ["0/Y.H2O.j2"]).
     """
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(template_dir)),
         keep_trailing_newline=True,
         undefined=jinja2.StrictUndefined,
     )
+    _skip = {s.replace("\\", "/") for s in (skip_templates or [])}
 
     for template_path in template_dir.rglob("*"):
         if template_path.is_dir():
             continue
 
         rel = template_path.relative_to(template_dir)
+        rel_posix = str(rel).replace("\\", "/")
+
+        if rel_posix in _skip:
+            continue
 
         if template_path.suffix == ".j2":
             # Render Jinja2 template
-            template = env.get_template(str(rel).replace("\\", "/"))
+            template = env.get_template(rel_posix)
             rendered = template.render(**context)
             out_path = output_dir / rel.with_suffix("")  # strip .j2
             out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -330,6 +346,10 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         delta_t = 1
         averaging_start = 0
 
+    # Determine mixture type from loyly config
+    loyly = data.get("loyly")
+    mixture_type = "multiComponent" if loyly else "pure"
+
     context = {
         **mesh,
         **heater,
@@ -339,7 +359,15 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "delta_t": delta_t,
         "averaging_start": averaging_start,
         "probes": probes,
+        "mixture_type": mixture_type,
+        "Y_H2O_initial": 0.01,
+        "Y_H2O_heater": 0.01,
     }
 
-    render_templates(_TEMPLATE_DIR, output_dir, context)
+    # Skip vapor field template for pure mixture cases
+    skip: list[str] = []
+    if mixture_type != "multiComponent":
+        skip.append("0/H2O.j2")
+
+    render_templates(_TEMPLATE_DIR, output_dir, context, skip_templates=skip)
     return output_dir

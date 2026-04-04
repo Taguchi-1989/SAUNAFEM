@@ -6,6 +6,68 @@ FoamFile
     object      thermophysicalProperties;
 }
 
+{% if mixture_type == "multiComponent" %}
+thermoType
+{
+    type            heRhoThermo;
+    mixture         multiComponentMixture;
+    transport       sutherland;
+    thermo          janaf;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+
+species
+(
+    air
+    H2O
+);
+
+inertSpecie air;
+
+air
+{
+    specie
+    {
+        molWeight   28.96;
+    }
+    thermodynamics
+    {
+        Tlow    200;
+        Thigh   5000;
+        Tcommon 1000;
+        highCpCoeffs (3.5684 -6.7515e-04 1.5235e-06 -6.7558e-10 1.0654e-13 -1046.2 3.7158);
+        lowCpCoeffs  (3.2137 7.3086e-04 -1.8753e-06 3.1880e-09 -1.8215e-12 -1005.2 6.0344);
+    }
+    transport
+    {
+        As      1.67212e-06;
+        Ts      170.672;
+    }
+}
+
+H2O
+{
+    specie
+    {
+        molWeight   18.015;
+    }
+    thermodynamics
+    {
+        Tlow    200;
+        Thigh   5000;
+        Tcommon 1000;
+        highCpCoeffs (2.6770 2.9732e-03 -7.7377e-07 9.4434e-11 -4.2690e-15 -29885.9 6.8826);
+        lowCpCoeffs  (4.1986 -2.0364e-03 6.5203e-06 -5.4879e-09 1.7720e-12 -30293.7 -0.8490);
+    }
+    transport
+    {
+        As      1.67212e-06;
+        Ts      170.672;
+    }
+}
+{% else %}
 thermoType
 {
     type            heRhoThermo;
@@ -34,3 +96,4 @@ mixture
         Pr          0.7;
     }
 }
+{% endif %}

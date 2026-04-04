@@ -115,6 +115,12 @@
           "type": "number",
           "minimum": 0,
           "description": "Start time for field averaging [s]"
+        },
+        "mixture": {
+          "type": "string",
+          "enum": ["pure", "multiComponent"],
+          "default": "pure",
+          "description": "Thermophysical mixture type"
         }
       },
       "additionalProperties": false

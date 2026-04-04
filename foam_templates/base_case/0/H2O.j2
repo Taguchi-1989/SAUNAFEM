@@ -1,0 +1,25 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      H2O;
+}
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform {{ Y_H2O_initial | default(0.01) }};
+
+boundaryField
+{
+    "(floor|ceiling|heater_wall_surround|opposite_wall|front|back)"
+    {
+        type            zeroGradient;
+    }
+
+    heater_wall
+    {
+        type            fixedValue;
+        value           uniform {{ Y_H2O_heater | default(0.01) }};
+    }
+}
