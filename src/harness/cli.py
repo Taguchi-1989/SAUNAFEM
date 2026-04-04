@@ -174,5 +174,32 @@ def report(case_dir: str, case_yaml: str) -> None:
     click.echo(f"  JSON: {json_path}")
 
 
+@main.command()
+@click.argument("case_dir", type=click.Path(exists=True))
+@click.option("--output", "-o", default=None, help="Output markdown file path")
+@click.option("--max-iter", default=50000, help="Max iterations per case")
+def batch(case_dir: str, output: str | None, max_iter: int) -> None:
+    """Run all YAML cases in a directory and generate comparison report."""
+    from harness.batch import run_batch
+
+    case_path = Path(case_dir)
+    yamls = sorted(case_path.glob("*.yaml"))
+
+    if not yamls:
+        click.echo(f"No YAML files found in {case_dir}")
+        return
+
+    click.echo(f"Running {len(yamls)} cases from {case_dir}...")
+    report = run_batch(yamls, max_iter=max_iter)
+
+    md = report.summary_table()
+    click.echo(md)
+
+    if output:
+        out_path = Path(output)
+        out_path.write_text(md, encoding="utf-8")
+        click.echo(f"\nReport saved to {out_path}")
+
+
 if __name__ == "__main__":
     main()
