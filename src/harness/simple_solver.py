@@ -55,6 +55,21 @@ class SimpleSolverResult:
     perceived_temp_lower: float = 0.0  # perceived temp at lower layer [C]
 
 
+@dataclass
+class TransientResult:
+    """Result of transient two-zone simulation with time-series data."""
+
+    time: np.ndarray              # time points [s]
+    t_upper_series: np.ndarray    # upper layer temp over time [K]
+    t_lower_series: np.ndarray    # lower layer temp over time [K]
+    z_int_series: np.ndarray      # interface height over time [m]
+    humidity_series: np.ndarray   # humidity ratio over time [kg/kg]
+    wall_temp_series: np.ndarray  # wall inner temp over time [K]
+    perceived_upper_series: np.ndarray  # perceived temp upper [C]
+    # Final state (same as steady)
+    steady_result: SimpleSolverResult
+
+
 def _compute_view_factors(
     room_w: float, room_d: float, room_h: float,
     heater_y: float, heater_h: float, heater_w: float,
@@ -502,6 +517,269 @@ def solve_two_zone(
         relative_humidity=float(props_upper["relative_humidity"]),
         perceived_temp_upper=float(props_upper["perceived_temp_c"]),
         perceived_temp_lower=float(props_lower["perceived_temp_c"]),
+    )
+
+
+def solve_transient(
+    case_yaml: Path,
+    n_profile: int = 80,
+    physical_dt: float = 1.0,
+    end_time: float = 300.0,
+    record_interval: float = 1.0,
+) -> TransientResult:
+    """Solve sauna thermal stratification as a real-time transient simulation.
+
+    Uses the same two-zone plume physics as ``solve_two_zone`` but steps
+    through real (physical) time from 0 to ``end_time`` and records
+    time-series data at every ``record_interval`` seconds.
+
+    Args:
+        case_yaml: Path to YAML case definition.
+        n_profile: Number of vertical profile points for final steady result.
+        physical_dt: Real time step size [s].
+        end_time: Total simulation time [s].
+        record_interval: How often to record a snapshot [s].
+
+    Returns:
+        TransientResult with time-series arrays and a final SimpleSolverResult.
+    """
+    data = load_yaml(case_yaml)
+    dims = data["geometry"]["dimensions"]
+    bc = data["boundary_conditions"]
+    heater = bc.get("heater", {})
+    walls = bc.get("walls", {})
+
+    height = dims["y"]
+    width = dims["x"]
+    depth = dims["z"]
+    a_floor = width * depth
+
+    power_w = heater.get("power_kw", 9.0) * 1000.0
+    t_wall = walls.get("temperature", 293.15)
+    heater_y = heater.get("position", {}).get("y", 0.0)
+    heater_h = heater.get("height", 0.5)
+    heater_center_y = heater_y + heater_h / 2.0
+
+    vf = _compute_view_factors(width, depth, height, heater_y, heater_h,
+                                heater.get("width", 0.6))
+    f_rad_lower = vf["floor"] + vf["lower_walls"]
+
+    # Loyly parameters
+    loyly = data.get("loyly")
+    if loyly:
+        water_kg = loyly.get("water_ml", 0) / 1000.0
+        loyly_time = loyly.get("time", 0.0)
+        tau_evap = loyly.get("tau_evap", 5.0)
+    else:
+        water_kg = 0.0
+        loyly_time = 0.0
+        tau_evap = 5.0
+
+    # Aufguss parameters
+    aufguss = data.get("aufguss")
+    if aufguss:
+        beta_aug = aufguss.get("beta_aug", 0.0)
+        aufguss_start = aufguss.get("start_time", 0.0)
+        aufguss_duration = aufguss.get("duration", 30.0)
+    else:
+        beta_aug = 0.0
+        aufguss_start = 0.0
+        aufguss_duration = 0.0
+
+    f_conv = 0.7
+    q_conv = power_w * f_conv
+
+    rho_0 = 1.1
+    cp = 1005.0
+
+    L_VAPORIZATION = 2.26e6
+    MW_STEAM = 18.015e-3
+    R_GAS = 8.314
+    P_ATM = 101325.0
+
+    wall_cfg = walls.get("model", "fixed")
+    wall_thickness = walls.get("thickness", 0.02)
+    wall_lambda = walls.get("conductivity", 0.12)
+    wall_rho_cp = walls.get("rho_cp", 0.4e6)
+
+    perimeter = 2 * (width + depth)
+
+    # Initial state
+    t_wall_inner = t_wall
+    t_upper = t_wall + 1.0
+    t_lower = t_wall
+    z_int = height * 0.95
+    humidity_ratio = 0.0
+
+    a_wall_total = 2 * (width * height + depth * height) + 2 * a_floor
+    wall_mass_cp = wall_rho_cp * wall_thickness * a_wall_total
+
+    total_steam = 0.0
+    peak_steam_rate = 0.0
+
+    # Time-series recording
+    n_records = int(end_time / record_interval) + 1
+    time_arr = np.zeros(n_records)
+    t_upper_arr = np.zeros(n_records)
+    t_lower_arr = np.zeros(n_records)
+    z_int_arr = np.zeros(n_records)
+    humidity_arr = np.zeros(n_records)
+    wall_temp_arr = np.zeros(n_records)
+    perceived_upper_arr = np.zeros(n_records)
+
+    record_idx = 0
+    next_record_time = 0.0
+
+    # Record initial state
+    props_init = _humid_air_properties(t_upper, humidity_ratio)
+    time_arr[0] = 0.0
+    t_upper_arr[0] = t_upper
+    t_lower_arr[0] = t_lower
+    z_int_arr[0] = z_int
+    humidity_arr[0] = humidity_ratio
+    wall_temp_arr[0] = t_wall_inner
+    perceived_upper_arr[0] = props_init["perceived_temp_c"]
+    record_idx = 1
+    next_record_time = record_interval
+
+    n_steps = int(end_time / physical_dt)
+    current_time = 0.0
+
+    for _step in range(n_steps):
+        current_time += physical_dt
+
+        # Layer volumes
+        v_upper = a_floor * (height - z_int)
+        v_lower = a_floor * z_int
+
+        if v_upper < 0.01 * a_floor * height:
+            v_upper = 0.01 * a_floor * height
+        if v_lower < 0.01 * a_floor * height:
+            v_lower = 0.01 * a_floor * height
+
+        # Density variation
+        rho_upper = rho_0 * t_wall / max(t_upper, 250.0)
+        rho_lower = rho_0 * t_wall / max(t_lower, 250.0)
+
+        # Plume at interface height
+        z_plume = max(0.01, z_int - heater_center_y)
+        m_plume, t_plume = _plume_entrainment(q_conv, z_plume, t_lower)
+
+        # Humidity-dependent properties
+        props = _humid_air_properties(t_upper, humidity_ratio)
+        h_wall = props["h_wall_eff"]
+        cp_eff = props["cp_mix"]
+
+        # Upper layer energy balance
+        q_plume_in = m_plume * cp_eff * (t_plume - t_upper)
+
+        upper_height = height - z_int
+        a_wall_upper = perimeter * upper_height + a_floor
+        q_wall_upper = h_wall * a_wall_upper * (t_upper - t_wall_inner)
+
+        q_rad_to_walls = power_w * (1.0 - f_conv)
+
+        m_upper = rho_upper * v_upper
+        dt_upper = (q_plume_in - q_wall_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
+        t_upper += physical_dt * dt_upper
+
+        # Steam injection (loyly)
+        if water_kg > 0 and current_time >= loyly_time:
+            elapsed = current_time - loyly_time
+            m_dot_steam = _evaporation_rate(water_kg, elapsed, tau_evap)
+            peak_steam_rate = max(peak_steam_rate, m_dot_steam)
+            total_steam += m_dot_steam * physical_dt
+
+            q_steam = m_dot_steam * L_VAPORIZATION
+            t_upper += physical_dt * q_steam / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
+
+            if m_upper > 0.1:
+                humidity_ratio += m_dot_steam * physical_dt / m_upper
+
+            v_steam = m_dot_steam * R_GAS * t_upper / (P_ATM * MW_STEAM)
+        else:
+            m_dot_steam = 0.0
+            v_steam = 0.0
+
+        # Lower layer energy balance
+        a_wall_lower = perimeter * z_int + a_floor
+        q_wall_lower = h_wall * a_wall_lower * (t_lower - t_wall_inner)
+
+        k_interface = 0.5
+        q_interface = k_interface * a_floor * (t_upper - t_lower) / (height * 0.1)
+
+        m_lower = rho_lower * v_lower
+        if m_lower > 0.1:
+            dt_lower = (q_rad_to_walls * f_rad_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
+        else:
+            dt_lower = 0.0
+        t_lower += physical_dt * dt_lower
+
+        # Interface movement
+        v_plume_flow = m_plume / max(rho_upper, 0.5)
+        dt_layers = max(t_upper - t_lower, 1.0)
+        v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
+        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
+        z_int += physical_dt * dz_int
+
+        # Clamp
+        z_int = np.clip(z_int, 0.05 * height, 0.95 * height)
+        t_upper = np.clip(t_upper, t_wall_inner, t_wall_inner + 200)
+        t_lower = np.clip(t_lower, t_wall - 1, t_upper)
+
+        # Lumped wall temperature evolution
+        if wall_cfg == "lumped" and wall_mass_cp > 0:
+            q_to_wall = q_wall_upper + q_wall_lower
+            q_rad_wall = q_rad_to_walls * (1.0 - f_rad_lower)
+            q_out = wall_lambda / wall_thickness * a_wall_total * (t_wall_inner - t_wall)
+            dt_wall = (q_to_wall + q_rad_wall - q_out) / wall_mass_cp
+            t_wall_inner += physical_dt * dt_wall
+            t_wall_inner = np.clip(t_wall_inner, t_wall, t_wall + 200)
+
+        # Aufguss forced mixing
+        if beta_aug > 0 and aufguss_start <= current_time <= aufguss_start + aufguss_duration:
+            q_mix = beta_aug * cp * (t_upper - t_lower)
+            if m_upper > 0.1:
+                t_upper -= physical_dt * q_mix / (m_upper * cp)
+            if m_lower > 0.1:
+                t_lower += physical_dt * q_mix / (m_lower * cp)
+            t_upper = np.clip(t_upper, t_wall_inner, t_wall_inner + 200)
+            t_lower = np.clip(t_lower, t_wall - 1, t_upper)
+
+        # Record snapshot
+        if record_idx < n_records and current_time >= next_record_time - 1e-9:
+            props_snap = _humid_air_properties(t_upper, humidity_ratio)
+            time_arr[record_idx] = current_time
+            t_upper_arr[record_idx] = t_upper
+            t_lower_arr[record_idx] = t_lower
+            z_int_arr[record_idx] = z_int
+            humidity_arr[record_idx] = humidity_ratio
+            wall_temp_arr[record_idx] = t_wall_inner
+            perceived_upper_arr[record_idx] = props_snap["perceived_temp_c"]
+            record_idx += 1
+            next_record_time += record_interval
+
+    # Trim arrays to actual recorded length
+    time_arr = time_arr[:record_idx]
+    t_upper_arr = t_upper_arr[:record_idx]
+    t_lower_arr = t_lower_arr[:record_idx]
+    z_int_arr = z_int_arr[:record_idx]
+    humidity_arr = humidity_arr[:record_idx]
+    wall_temp_arr = wall_temp_arr[:record_idx]
+    perceived_upper_arr = perceived_upper_arr[:record_idx]
+
+    # Get final steady result using solve_two_zone
+    steady = solve_two_zone(case_yaml, n_profile=n_profile)
+
+    return TransientResult(
+        time=time_arr,
+        t_upper_series=t_upper_arr,
+        t_lower_series=t_lower_arr,
+        z_int_series=z_int_arr,
+        humidity_series=humidity_arr,
+        wall_temp_series=wall_temp_arr,
+        perceived_upper_series=perceived_upper_arr,
+        steady_result=steady,
     )
 
 

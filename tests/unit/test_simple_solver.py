@@ -7,9 +7,11 @@ from pathlib import Path
 import yaml
 
 from harness.simple_solver import (
+    TransientResult,
     _compute_view_factors,
     _evaporation_rate,
     _plume_entrainment,
+    solve_transient,
     solve_two_zone,
 )
 
@@ -342,4 +344,73 @@ class TestBetaAug:
         # They should be within a few degrees — mixing redistributes, not creates
         assert abs(avg_t_aug - avg_t_dry) < 10.0, (
             f"Aufguss should conserve energy: dry_avg={avg_t_dry:.2f}, aug_avg={avg_t_aug:.2f}"
+        )
+
+
+class TestTransientSolver:
+    def test_transient_returns_time_series(self, tmp_path: Path) -> None:
+        """Transient solver on dry case returns arrays of correct length."""
+        path = _write_case_yaml(tmp_path)
+        result = solve_transient(path, end_time=50.0, physical_dt=1.0, record_interval=1.0)
+        assert isinstance(result, TransientResult)
+        # Should have ~51 records (t=0, 1, 2, ..., 50)
+        expected_len = int(50.0 / 1.0) + 1
+        assert len(result.time) == expected_len
+        assert len(result.t_upper_series) == expected_len
+        assert len(result.t_lower_series) == expected_len
+        assert len(result.z_int_series) == expected_len
+        assert len(result.humidity_series) == expected_len
+        assert len(result.wall_temp_series) == expected_len
+        assert len(result.perceived_upper_series) == expected_len
+        # Time should be monotonically increasing
+        assert all(result.time[i] < result.time[i + 1] for i in range(len(result.time) - 1))
+
+    def test_transient_loyly_peak(self, tmp_path: Path) -> None:
+        """Loyly transient should show T_upper peak above dry steady-state T_upper."""
+        (tmp_path / "dry").mkdir()
+        (tmp_path / "wet").mkdir()
+        dry_path = _write_case_yaml(tmp_path / "dry")
+        wet_path = _write_loyly_yaml(tmp_path / "wet", water_ml=500)
+
+        # Get dry steady-state reference
+        dry_steady = solve_two_zone(dry_path, max_iter=10000)
+
+        # Run transient with loyly
+        wet_trans = solve_transient(wet_path, end_time=100.0, physical_dt=0.5, record_interval=1.0)
+
+        # The peak T_upper during transient should exceed the dry steady-state value
+        peak_t_upper = float(wet_trans.t_upper_series.max())
+        assert peak_t_upper > dry_steady.upper_layer_temp, (
+            f"Loyly peak {peak_t_upper:.1f} K should exceed dry steady {dry_steady.upper_layer_temp:.1f} K"
+        )
+
+    def test_transient_aufguss_mixing(self, tmp_path: Path) -> None:
+        """Aufguss should reduce stratification during its active window."""
+        path = _write_aufguss_yaml(
+            tmp_path, beta_aug=0.5, start_time=30.0, duration=40.0,
+        )
+        result = solve_transient(path, end_time=100.0, physical_dt=1.0, record_interval=1.0)
+
+        # Stratification = T_upper - T_lower
+        strat = result.t_upper_series - result.t_lower_series
+
+        # Find stratification just before aufguss starts and during aufguss
+        idx_before = int(25.0 / 1.0)  # t=25s, before aufguss
+        idx_during = int(60.0 / 1.0)  # t=60s, during aufguss
+
+        assert strat[idx_during] < strat[idx_before], (
+            f"Aufguss should reduce stratification: before={strat[idx_before]:.2f}, "
+            f"during={strat[idx_during]:.2f}"
+        )
+
+    def test_transient_matches_steady(self, tmp_path: Path) -> None:
+        """After long enough transient, final state should approach steady-state."""
+        path = _write_case_yaml(tmp_path)
+        steady = solve_two_zone(path, max_iter=10000)
+        trans = solve_transient(path, end_time=2000.0, physical_dt=1.0, record_interval=10.0)
+
+        # Final transient T_upper should be close to steady-state T_upper
+        final_t_upper = float(trans.t_upper_series[-1])
+        assert abs(final_t_upper - steady.upper_layer_temp) < 5.0, (
+            f"Transient final {final_t_upper:.1f} K vs steady {steady.upper_layer_temp:.1f} K"
         )
