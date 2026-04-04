@@ -56,6 +56,22 @@ st.sidebar.subheader("Environment")
 t_wall_c = st.sidebar.slider("Wall temperature [C]", 10.0, 30.0, 20.0, 1.0)
 t_wall_k = t_wall_c + 273.15
 
+st.sidebar.subheader("Löyly (Steam)")
+loyly_enabled = st.sidebar.checkbox("Enable löyly", value=False)
+if loyly_enabled:
+    water_ml = st.sidebar.slider("Water [mL]", 10, 500, 100, 10)
+    tau_evap = st.sidebar.slider("Evaporation tau [s]", 1.0, 20.0, 5.0, 0.5)
+else:
+    water_ml = 0
+    tau_evap = 5.0
+
+st.sidebar.subheader("Aufguss")
+aufguss_enabled = st.sidebar.checkbox("Enable aufguss", value=False)
+if aufguss_enabled:
+    beta_aug = st.sidebar.slider("Mixing coefficient β", 0.1, 2.0, 0.5, 0.1)
+else:
+    beta_aug = 0.0
+
 # Probe positions follow bench positions
 upper_probe_y = upper_bench_y + 0.6
 lower_probe_y = lower_bench_y + 0.6
@@ -76,7 +92,14 @@ case_data = {
         "mesh_level": "M0",
     },
     "boundary_conditions": {
-        "walls": {"temperature": t_wall_k, "type": "mixed"},
+        "walls": {
+            "temperature": t_wall_k,
+            "type": "mixed",
+            "model": "lumped",
+            "thickness": 0.015,
+            "conductivity": 0.12,
+            "rho_cp": 500000,
+        },
         "heater": {
             "power_kw": heater_power,
             "position": {"x": 0.0, "y": heater_y, "z": room_z / 2},
@@ -95,6 +118,11 @@ case_data = {
         {"name": "floor_level", "position": {"x": room_x / 2, "y": 0.1, "z": room_z / 2}, "fields": ["T"]},
     ],
 }
+
+if loyly_enabled:
+    case_data["loyly"] = {"water_ml": water_ml, "time": 0.0, "tau_evap": tau_evap}
+if aufguss_enabled:
+    case_data["aufguss"] = {"beta_aug": beta_aug, "start_time": 0.0, "duration": 1000.0}
 
 # Write temp YAML and solve
 with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
@@ -128,6 +156,7 @@ def build_room_svg(
     t_upper_c: float,
     t_lower_c: float,
     t_wall_c: float,
+    t_wall_inner_c: float = 0.0,
 ) -> str:
     """Generate an SVG cross-section of the sauna room.
 
@@ -425,7 +454,7 @@ def build_room_svg(
     parts.append(
         f'<text x="{px(0) - 4}" y="{py(room_h / 2)}" text-anchor="end" '
         f'font-size="9" fill="#888" transform="rotate(-90,{px(0) - 4},{py(room_h / 2)})">'
-        f'T_wall = {t_wall_c:.0f}&#176;C</text>'
+        f'T_wall: {t_wall_c:.0f}&#8594;{t_wall_inner_c:.0f}&#176;C</text>'
     )
 
     parts.append("</svg>")
@@ -435,8 +464,8 @@ def build_room_svg(
 # ==========================================================
 # Main layout
 # ==========================================================
-tab_diagram, tab_profile, tab_contour = st.tabs(
-    ["Room Diagram", "Temperature Profile", "Cross-Section Contour"]
+tab_diagram, tab_profile, tab_contour, tab_comfort = st.tabs(
+    ["Room Diagram", "Temperature Profile", "Cross-Section Contour", "Thermal Comfort"]
 )
 
 # --- Tab 1: Room Diagram (SVG) ---
@@ -461,20 +490,23 @@ with tab_diagram:
         t_upper_c=result.upper_layer_temp - 273.15,
         t_lower_c=result.lower_layer_temp - 273.15,
         t_wall_c=t_wall_c,
+        t_wall_inner_c=result.wall_inner_temp - 273.15,
     )
 
     st.markdown(svg, unsafe_allow_html=True)
 
     # Key metrics below the diagram
-    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a, col_b, col_c, col_d, col_e = st.columns(5)
     with col_a:
-        st.metric("Upper Layer", f"{result.upper_layer_temp - 273.15:.1f} C")
+        st.metric("Upper Layer", f"{result.upper_layer_temp - 273.15:.1f} °C")
     with col_b:
-        st.metric("Lower Layer", f"{result.lower_layer_temp - 273.15:.1f} C")
+        st.metric("Lower Layer", f"{result.lower_layer_temp - 273.15:.1f} °C")
     with col_c:
-        st.metric("Interface Height", f"{result.interface_height:.2f} m")
+        st.metric("Wall Surface", f"{result.wall_inner_temp - 273.15:.1f} °C")
     with col_d:
-        st.metric("Plume Flow", f"{result.plume_mass_flow:.3f} kg/s")
+        st.metric("Interface", f"{result.interface_height:.2f} m")
+    with col_e:
+        st.metric("Humidity", f"{result.humidity_ratio * 1000:.1f} g/kg")
 
     seat_base = upper_bench_y if person_seat == "Upper bench" else lower_bench_y
     head_y = seat_base + person_height_cm / 100.0 * SEATED_HEIGHT_RATIO
@@ -561,6 +593,38 @@ with tab_contour:
     fig3.tight_layout()
     st.pyplot(fig3)
     plt.close()
+
+# --- Tab 4: Thermal Comfort ---
+with tab_comfort:
+    st.subheader("Thermal Comfort Analysis")
+
+    col_l, col_r = st.columns(2)
+
+    with col_l:
+        st.markdown("### Temperature Summary")
+        st.metric("Upper Layer (dry-bulb)", f"{result.upper_layer_temp - 273.15:.1f} °C")
+        st.metric("Lower Layer (dry-bulb)", f"{result.lower_layer_temp - 273.15:.1f} °C")
+        st.metric("Wall Surface", f"{result.wall_inner_temp - 273.15:.1f} °C")
+
+    with col_r:
+        st.markdown("### Humidity & Perceived Temperature")
+        st.metric("Absolute Humidity", f"{result.humidity_ratio * 1000:.1f} g/kg")
+        st.metric("Relative Humidity", f"{result.relative_humidity:.1%}")
+        st.metric("Perceived Temp (Upper)", f"{result.perceived_temp_upper:.1f} °C")
+        st.metric("Perceived Temp (Lower)", f"{result.perceived_temp_lower:.1f} °C")
+
+    # Thermal stress gauge
+    perceived = result.perceived_temp_upper
+    if perceived < 60:
+        level, color = "Comfortable", "green"
+    elif perceived < 80:
+        level, color = "Moderate", "orange"
+    elif perceived < 100:
+        level, color = "Intense", "red"
+    else:
+        level, color = "Extreme", "darkred"
+
+    st.markdown(f"### Thermal Stress Level: :{color}[**{level}**] ({perceived:.0f}°C perceived)")
 
 # --- KPI & Solver Info (below tabs) ---
 st.divider()
