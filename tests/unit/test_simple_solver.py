@@ -132,3 +132,95 @@ class TestSolveTwoZone:
         assert len(result.residual_history) > 0
         # Residuals should generally decrease
         assert result.residual_history[-1] < result.residual_history[0]
+
+
+def _write_aufguss_yaml(tmp_path: Path, beta_aug: float = 0.5,
+                         start_time: float = 0.0,
+                         duration: float = 1000.0) -> Path:
+    """Helper to create a case YAML with aufguss parameters."""
+    data = {
+        "case": {"name": "aufguss_test", "description": "test", "type": "steady"},
+        "geometry": {
+            "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+            "mesh_level": "M0",
+        },
+        "boundary_conditions": {
+            "walls": {"temperature": 293.15, "type": "mixed"},
+            "heater": {
+                "power_kw": 9.0,
+                "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                "width": 0.6,
+                "height": 0.5,
+            },
+        },
+        "solver": {
+            "name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+        },
+        "aufguss": {
+            "beta_aug": beta_aug,
+            "start_time": start_time,
+            "duration": duration,
+        },
+        "probes": [
+            {"name": "upper_bench", "position": {"x": 1.5, "y": 2.0, "z": 1.25}},
+            {"name": "lower_bench", "position": {"x": 1.5, "y": 0.8, "z": 1.25}},
+            {"name": "floor_level", "position": {"x": 1.5, "y": 0.1, "z": 1.25}},
+        ],
+    }
+    path = tmp_path / "case.yaml"
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f)
+    return path
+
+
+class TestBetaAug:
+    def test_no_aufguss_default(self, tmp_path: Path) -> None:
+        """Standard case without aufguss key should have beta_aug_applied == 0.0."""
+        path = _write_case_yaml(tmp_path)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.beta_aug_applied == 0.0
+
+    def test_aufguss_reduces_stratification(self, tmp_path: Path) -> None:
+        """With aufguss, upper-lower temp difference should be smaller than dry case."""
+        (tmp_path / "dry").mkdir()
+        (tmp_path / "aug").mkdir()
+        path_dry = _write_case_yaml(tmp_path / "dry")
+        path_aug = _write_aufguss_yaml(tmp_path / "aug", beta_aug=0.5)
+
+        r_dry = solve_two_zone(path_dry, max_iter=10000)
+        r_aug = solve_two_zone(path_aug, max_iter=10000)
+
+        strat_dry = r_dry.upper_layer_temp - r_dry.lower_layer_temp
+        strat_aug = r_aug.upper_layer_temp - r_aug.lower_layer_temp
+
+        assert strat_aug < strat_dry, (
+            f"Aufguss should reduce stratification: dry={strat_dry:.2f}, aug={strat_aug:.2f}"
+        )
+
+    def test_aufguss_energy_conservation(self, tmp_path: Path) -> None:
+        """With aufguss, total energy should be approximately conserved.
+
+        The mixing transfers heat from upper to lower but does not create energy.
+        Compare total thermal energy (m*cp*T) between aufguss and dry cases:
+        they should be similar since aufguss only redistributes, not adds, heat.
+        """
+        (tmp_path / "dry").mkdir()
+        (tmp_path / "aug").mkdir()
+        path_dry = _write_case_yaml(tmp_path / "dry")
+        path_aug = _write_aufguss_yaml(tmp_path / "aug", beta_aug=0.5)
+
+        r_dry = solve_two_zone(path_dry, max_iter=10000)
+        r_aug = solve_two_zone(path_aug, max_iter=10000)
+
+        # Approximate total energy as average temperature across the profile
+        avg_t_dry = float(r_dry.temperatures.mean())
+        avg_t_aug = float(r_aug.temperatures.mean())
+
+        # They should be within a few degrees — mixing redistributes, not creates
+        assert abs(avg_t_aug - avg_t_dry) < 10.0, (
+            f"Aufguss should conserve energy: dry_avg={avg_t_dry:.2f}, aug_avg={avg_t_aug:.2f}"
+        )

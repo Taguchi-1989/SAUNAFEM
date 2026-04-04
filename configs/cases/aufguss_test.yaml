@@ -1,0 +1,47 @@
+case:
+  name: aufguss_test
+  description: "Aufguss ROM test — forced mixing reduces stratification"
+  type: steady
+
+geometry:
+  dimensions:
+    x: 3.0
+    y: 2.5
+    z: 2.5
+  mesh_level: M0
+
+boundary_conditions:
+  walls:
+    temperature: 293.15
+    type: mixed
+  heater:
+    power_kw: 9.0
+    position:
+      x: 0.0
+      y: 0.1
+      z: 1.25
+    width: 0.6
+    height: 0.5
+
+solver:
+  name: buoyantPimpleFoam
+  end_time: 300
+  write_interval: 10
+  delta_t: 0.05
+  averaging_start: 150
+
+aufguss:
+  beta_aug: 0.5
+  start_time: 0.0
+  duration: 1000.0
+
+probes:
+  - name: upper_bench
+    position: { x: 1.5, y: 2.0, z: 1.25 }
+    fields: [T]
+  - name: lower_bench
+    position: { x: 1.5, y: 0.8, z: 1.25 }
+    fields: [T]
+  - name: floor_level
+    position: { x: 1.5, y: 0.1, z: 1.25 }
+    fields: [T]

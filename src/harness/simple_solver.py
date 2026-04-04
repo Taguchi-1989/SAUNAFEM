@@ -45,6 +45,7 @@ class SimpleSolverResult:
     upper_layer_temp: float       # upper layer temperature [K]
     lower_layer_temp: float       # lower layer temperature [K]
     plume_mass_flow: float        # plume mass flow at interface [kg/s]
+    beta_aug_applied: float = 0.0  # forced mixing coefficient used [kg/s]
 
 
 def _plume_entrainment(
@@ -127,6 +128,16 @@ def solve_two_zone(
     heater_h = heater.get("height", 0.5)
     heater_center_y = heater_y + heater_h / 2.0
 
+    aufguss = data.get("aufguss")
+    if aufguss:
+        beta_aug = aufguss.get("beta_aug", 0.0)  # forced mixing [kg/s]
+        aufguss_start = aufguss.get("start_time", 0.0)
+        aufguss_duration = aufguss.get("duration", 30.0)
+    else:
+        beta_aug = 0.0
+        aufguss_start = 0.0
+        aufguss_duration = 0.0
+
     # Convective fraction of heater output (rest is radiant to walls)
     f_conv = 0.7
     q_conv = power_w * f_conv
@@ -146,6 +157,7 @@ def solve_two_zone(
 
     residual_history = []
     converged = False
+    pseudo_time = 0.0
 
     for iteration in range(max_iter):
         t_upper_old = t_upper
@@ -221,11 +233,24 @@ def solve_two_zone(
         t_upper = np.clip(t_upper, t_wall, t_wall + 200)
         t_lower = np.clip(t_lower, t_wall - 1, t_upper)
 
+        # Aufguss forced mixing (ROM: transfers heat from upper to lower)
+        if beta_aug > 0 and aufguss_start <= pseudo_time <= aufguss_start + aufguss_duration:
+            q_mix = beta_aug * cp * (t_upper - t_lower)
+            if m_upper > 0.1:
+                t_upper -= dt * q_mix / (m_upper * cp)
+            if m_lower > 0.1:
+                t_lower += dt * q_mix / (m_lower * cp)
+            # Re-clamp after mixing
+            t_upper = np.clip(t_upper, t_wall, t_wall + 200)
+            t_lower = np.clip(t_lower, t_wall - 1, t_upper)
+
         # Convergence check
         res_t = abs(t_upper - t_upper_old)
         res_z = abs(z_int - z_int_old)
         residual = max(res_t, res_z * 10)  # scale z residual
         residual_history.append(residual)
+
+        pseudo_time += dt
 
         if residual < tol and iteration > 100:
             converged = True
@@ -268,6 +293,7 @@ def solve_two_zone(
         upper_layer_temp=float(t_upper),
         lower_layer_temp=float(t_lower),
         plume_mass_flow=float(m_plume),
+        beta_aug_applied=float(beta_aug) if aufguss else 0.0,
     )
 
 
