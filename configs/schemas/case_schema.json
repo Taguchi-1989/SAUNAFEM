@@ -119,6 +119,15 @@
       },
       "additionalProperties": false
     },
+    "loyly": {
+      "type": "object",
+      "properties": {
+        "water_ml": {"type": "number", "minimum": 0, "description": "Water amount in mL"},
+        "time": {"type": "number", "minimum": 0, "description": "Time when water is poured [s]"},
+        "tau_evap": {"type": "number", "minimum": 0.1, "default": 5.0, "description": "Evaporation time constant [s]"}
+      },
+      "required": ["water_ml"]
+    },
     "probes": {
       "type": "array",
       "items": {

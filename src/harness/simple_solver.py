@@ -45,6 +45,8 @@ class SimpleSolverResult:
     upper_layer_temp: float       # upper layer temperature [K]
     lower_layer_temp: float       # lower layer temperature [K]
     plume_mass_flow: float        # plume mass flow at interface [kg/s]
+    steam_mass_flow: float = 0.0      # peak evaporation rate [kg/s]
+    total_steam_generated: float = 0.0 # cumulative steam mass [kg]
 
 
 def _plume_entrainment(
@@ -84,6 +86,21 @@ def _plume_entrainment(
     t_plume = t_amb + q_conv_w / (m_dot * cp) if m_dot > 0.001 else t_amb + 100.0
 
     return m_dot, t_plume
+
+
+def _evaporation_rate(
+    water_mass_kg: float,
+    elapsed: float,
+    tau_evap: float = 5.0,  # characteristic evaporation time [s]
+    stone_temp_k: float = 573.15,  # stone surface temp ~300C
+) -> float:
+    """Evaporation rate of water on hot stones [kg/s].
+
+    Exponential decay model: m_dot = (water_mass / tau) * exp(-t / tau)
+    """
+    if water_mass_kg <= 0 or elapsed < 0:
+        return 0.0
+    return (water_mass_kg / tau_evap) * np.exp(-elapsed / tau_evap)
 
 
 def solve_two_zone(
@@ -127,6 +144,17 @@ def solve_two_zone(
     heater_h = heater.get("height", 0.5)
     heater_center_y = heater_y + heater_h / 2.0
 
+    # Löyly (steam) parameters
+    loyly = data.get("loyly")
+    if loyly:
+        water_kg = loyly.get("water_ml", 0) / 1000.0  # mL -> kg
+        loyly_time = loyly.get("time", 0.0)  # when water is poured [s]
+        tau_evap = loyly.get("tau_evap", 5.0)
+    else:
+        water_kg = 0.0
+        loyly_time = 0.0
+        tau_evap = 5.0
+
     # Convective fraction of heater output (rest is radiant to walls)
     f_conv = 0.7
     q_conv = power_w * f_conv
@@ -134,6 +162,12 @@ def solve_two_zone(
     # Air properties
     rho_0 = 1.1  # reference density at ~300K [kg/m3]
     cp = 1005.0
+
+    # Steam properties
+    L_VAPORIZATION = 2.26e6  # latent heat of water [J/kg]
+    MW_STEAM = 18.015e-3     # molecular weight of steam [kg/mol]
+    R_GAS = 8.314            # universal gas constant [J/(mol*K)]
+    P_ATM = 101325.0         # atmospheric pressure [Pa]
 
     # Wall heat transfer
     h_wall = 8.0  # natural convection HTC [W/(m2*K)]
@@ -146,6 +180,9 @@ def solve_two_zone(
 
     residual_history = []
     converged = False
+    total_steam = 0.0
+    peak_steam_rate = 0.0
+    pseudo_time = 0.0  # accumulated pseudo-time for evaporation model
 
     for iteration in range(max_iter):
         t_upper_old = t_upper
@@ -186,6 +223,25 @@ def solve_two_zone(
         dt_upper = (q_plume_in - q_wall_upper) / (m_upper * cp) if m_upper > 0.1 else 0.0
         t_upper += dt * dt_upper
 
+        # Steam injection (löyly)
+        if water_kg > 0 and pseudo_time >= loyly_time:
+            elapsed = pseudo_time - loyly_time
+            m_dot_steam = _evaporation_rate(water_kg, elapsed, tau_evap)
+            peak_steam_rate = max(peak_steam_rate, m_dot_steam)
+            total_steam += m_dot_steam * dt
+
+            # Latent heat adds energy to upper layer
+            q_steam = m_dot_steam * L_VAPORIZATION
+            t_upper += dt * q_steam / (m_upper * cp) if m_upper > 0.1 else 0.0
+
+            # Steam volume expansion pushes interface down
+            v_steam = m_dot_steam * R_GAS * t_upper / (P_ATM * MW_STEAM)
+        else:
+            m_dot_steam = 0.0
+            v_steam = 0.0
+
+        pseudo_time += dt
+
         # --- Lower layer energy balance ---
         # Lower layer receives heat from: wall radiation, conduction from upper
         # Lower layer loses heat to: plume entrainment, floor, lower walls
@@ -213,7 +269,7 @@ def solve_two_zone(
         v_plume_flow = m_plume / max(rho_upper, 0.5)  # volume flow into upper
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall) / (rho_upper * cp * dt_layers)
-        dz_int = (-v_plume_flow + v_return) / a_floor
+        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
         z_int += dt * dz_int
 
         # Clamp
@@ -268,6 +324,8 @@ def solve_two_zone(
         upper_layer_temp=float(t_upper),
         lower_layer_temp=float(t_lower),
         plume_mass_flow=float(m_plume),
+        steam_mass_flow=float(peak_steam_rate),
+        total_steam_generated=float(total_steam),
     )
 
 

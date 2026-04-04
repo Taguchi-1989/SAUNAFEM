@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from harness.simple_solver import _plume_entrainment, solve_two_zone
+from harness.simple_solver import _evaporation_rate, _plume_entrainment, solve_two_zone
 
 
 def _write_case_yaml(tmp_path: Path, **overrides) -> Path:
@@ -132,3 +132,89 @@ class TestSolveTwoZone:
         assert len(result.residual_history) > 0
         # Residuals should generally decrease
         assert result.residual_history[-1] < result.residual_history[0]
+
+
+def _write_loyly_yaml(tmp_path: Path, water_ml: float = 100, **overrides) -> Path:
+    """Helper to create a case YAML with löyly parameters."""
+    data = {
+        "case": {"name": "loyly_test", "description": "test", "type": "transient"},
+        "geometry": {
+            "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+            "mesh_level": "M0",
+        },
+        "boundary_conditions": {
+            "walls": {"temperature": 293.15, "type": "mixed"},
+            "heater": {
+                "power_kw": 9.0,
+                "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                "width": 0.6,
+                "height": 0.5,
+            },
+        },
+        "solver": {
+            "name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+        },
+        "loyly": {
+            "water_ml": water_ml,
+            "time": 0.0,
+            "tau_evap": 5.0,
+        },
+        "probes": [
+            {"name": "upper_bench", "position": {"x": 1.5, "y": 2.0, "z": 1.25}},
+            {"name": "lower_bench", "position": {"x": 1.5, "y": 0.8, "z": 1.25}},
+            {"name": "floor_level", "position": {"x": 1.5, "y": 0.1, "z": 1.25}},
+        ],
+    }
+    for key, val in overrides.items():
+        if key == "power_kw":
+            data["boundary_conditions"]["heater"]["power_kw"] = val
+    path = tmp_path / "loyly_case.yaml"
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f)
+    return path
+
+
+class TestSteamPhysics:
+    def test_evaporation_rate_basic(self) -> None:
+        """Rate is positive at t=0 and decays over time."""
+        rate_0 = _evaporation_rate(0.1, 0.0)
+        rate_5 = _evaporation_rate(0.1, 5.0)
+        rate_20 = _evaporation_rate(0.1, 20.0)
+        assert rate_0 > 0
+        assert rate_5 < rate_0  # decays
+        assert rate_20 < rate_5  # continues decaying
+
+    def test_evaporation_rate_zero_water(self) -> None:
+        """Zero water mass gives zero rate."""
+        assert _evaporation_rate(0.0, 0.0) == 0.0
+        assert _evaporation_rate(0.0, 5.0) == 0.0
+        assert _evaporation_rate(-1.0, 0.0) == 0.0
+
+    def test_loyly_raises_temperature(self, tmp_path: Path) -> None:
+        """Löyly steam injection should raise upper layer temperature.
+
+        Use limited iterations to capture the transient steam boost
+        before the system re-equilibrates.
+        """
+        (tmp_path / "dry").mkdir()
+        (tmp_path / "wet").mkdir()
+        dry_path = _write_case_yaml(tmp_path / "dry")
+        wet_path = _write_loyly_yaml(tmp_path / "wet", water_ml=500)
+        # Use fewer iterations so the transient steam effect is visible
+        dry_result = solve_two_zone(dry_path, max_iter=200, dt=0.5, tol=1e-10)
+        wet_result = solve_two_zone(wet_path, max_iter=200, dt=0.5, tol=1e-10)
+        assert wet_result.upper_layer_temp > dry_result.upper_layer_temp
+
+    def test_steam_fields_in_result(self, tmp_path: Path) -> None:
+        """New steam fields exist and are non-negative."""
+        path = _write_loyly_yaml(tmp_path, water_ml=100)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.steam_mass_flow >= 0.0
+        assert result.total_steam_generated >= 0.0
+        # With 100mL of water, should have positive steam
+        assert result.steam_mass_flow > 0.0
+        assert result.total_steam_generated > 0.0
