@@ -153,6 +153,15 @@
         },
         "additionalProperties": false
       }
+    },
+    "aufguss": {
+      "type": "object",
+      "properties": {
+        "beta_aug": {"type": "number", "minimum": 0, "description": "Forced mixing coefficient [kg/s] from CFD ROM"},
+        "start_time": {"type": "number", "minimum": 0, "description": "Aufguss start time [s]"},
+        "duration": {"type": "number", "minimum": 0, "default": 30.0, "description": "Aufguss duration [s]"}
+      },
+      "required": ["beta_aug"]
     }
   },
   "additionalProperties": false
