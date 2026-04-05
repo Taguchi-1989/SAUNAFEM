@@ -22,6 +22,20 @@ solvers
         relTol          0;
     }
 
+    rho
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-7;
+        relTol          0.1;
+    }
+
+    rhoFinal
+    {
+        $rho;
+        relTol          0;
+    }
+
     "(U|T|k|omega|epsilon)"
     {
         solver          PBiCGStab;
