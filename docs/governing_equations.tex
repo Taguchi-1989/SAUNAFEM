@@ -933,14 +933,21 @@ PoC フェーズに適している。
 
 $
 \Delta p = \rho_{\text{amb}} \, g \, (z_{\text{exhaust}} - z_{\text{supply}}) \,
-\frac{T_{\text{exhaust}} - T_{\text{ambient}}}{T_{\text{ambient}}}
+\frac{\bar{T}_{\text{col}} - T_{\text{ambient}}}{T_{\text{ambient}}}
 $
 
-ここで:
+ここで $\bar{T}_{\text{col}}$ は給排気口間の高さ加重平均温度:
+
+$
+\bar{T}_{\text{col}} = f_{\text{lower}} \, T_{\text{supply}} + f_{\text{upper}} \, T_{\text{exhaust}}
+$
+
+$f_{\text{lower}} = \frac{\min(z_{\text{int}}, z_{\text{exhaust}}) - z_{\text{supply}}}{z_{\text{exhaust}} - z_{\text{supply}}}$, \quad
+$f_{\text{upper}} = 1 - f_{\text{lower}}$
 
 \begin{itemize} \item $\rho_{\text{amb}}$: 外気密度 [kg/m³] \end{itemize}
 \begin{itemize} \item $z_{\text{exhaust}}, z_{\text{supply}}$: 排気口・給気口の高さ [m] \end{itemize}
-\begin{itemize} \item $T_{\text{exhaust}}$: 排気口位置のゾーン温度（界面位置に応じて $T_{\text{upper}}$ または $T_{\text{lower}}$） \end{itemize}
+\begin{itemize} \item $T_{\text{supply}}, T_{\text{exhaust}}$: 各口位置のゾーン温度（界面位置に応じて $T_{\text{upper}}$ または $T_{\text{lower}}$） \end{itemize}
 \begin{itemize} \item $T_{\text{ambient}}$: 外気温 [K] \end{itemize}
 
 \subsubsection{10.3 オリフィス流量モデル}

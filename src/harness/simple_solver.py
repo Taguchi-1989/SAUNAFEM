@@ -316,8 +316,12 @@ def _ventilation_flow(
     # Ambient density
     rho_ambient = rho_0 * 300.0 / max(t_ambient, 250.0)
 
-    # Stack effect pressure difference
-    delta_p = rho_ambient * g * (z_exhaust - z_supply) * (t_at_exhaust - t_ambient) / max(t_ambient, 250.0)
+    # Stack effect pressure difference (height-weighted average temperature)
+    dz_total = z_exhaust - z_supply
+    dz_lower_frac = max(0.0, min(z_int, z_exhaust) - z_supply) / dz_total if dz_total > 0 else 0.5
+    dz_upper_frac = 1.0 - dz_lower_frac
+    t_avg_col = dz_lower_frac * t_at_supply + dz_upper_frac * t_at_exhaust
+    delta_p = rho_ambient * g * dz_total * (t_avg_col - t_ambient) / max(t_ambient, 250.0)
 
     # Effective orifice area (balanced flow: limited by smaller vent)
     a_eff = min(cd_supply * a_supply, cd_exhaust * a_exhaust)
@@ -720,6 +724,11 @@ def solve_two_zone(
                 # affects h_wall, cp) but does not add net energy to the air.
             v_steam = 0.0
             m_dot_steam = 0.0
+            # Ventilation humidity dilution (exhaust removes humid air, supply brings dry)
+            if vent_enabled and m_vent > 0 and m_upper > 0.1:
+                dw = m_vent * (w_ambient_vent - humidity_ratio) / m_upper
+                humidity_ratio += dt * dw
+                humidity_ratio = max(humidity_ratio, 0.0)
         else:
             m_dot_steam = 0.0
             v_steam = 0.0
