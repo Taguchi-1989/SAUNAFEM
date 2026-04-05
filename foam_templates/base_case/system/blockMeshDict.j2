@@ -98,6 +98,28 @@ boundary
 {% endfor %}
         );
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type patch;
+        faces
+        (
+{% for face in supply_vent_faces %}
+            ({{ face | join(' ') }})
+{% endfor %}
+        );
+    }
+    exhaust_vent
+    {
+        type patch;
+        faces
+        (
+{% for face in exhaust_vent_faces %}
+            ({{ face | join(' ') }})
+{% endfor %}
+        );
+    }
+{% endif %}
 );
 
 mergePatchPairs

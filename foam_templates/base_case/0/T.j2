@@ -59,4 +59,18 @@ boundaryField
         type            fixedValue;
         value           uniform {{ T_walls }};
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            inletOutlet;
+        inletValue      uniform {{ T_ambient | default(293.15) }};
+        value           uniform {{ T_ambient | default(293.15) }};
+    }
+    exhaust_vent
+    {
+        type            inletOutlet;
+        inletValue      uniform {{ T_ambient | default(293.15) }};
+        value           uniform {{ T_walls }};
+    }
+{% endif %}
 }

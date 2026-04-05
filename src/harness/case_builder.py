@@ -72,7 +72,11 @@ def _allocate_segment_cells(points: list[float], total_cells: int) -> list[int]:
     return cells
 
 
-def _build_block_mesh_context(geometry: dict, boundary_conditions: dict) -> dict:
+def _build_block_mesh_context(
+    geometry: dict,
+    boundary_conditions: dict,
+    ventilation: dict | None = None,
+) -> dict:
     """Build a segmented mesh so the heater occupies its own wall patch."""
     mesh = compute_mesh_params(geometry)
     dims = geometry["dimensions"]
@@ -131,9 +135,23 @@ def _build_block_mesh_context(geometry: dict, boundary_conditions: dict) -> dict
     heater_faces: list[tuple[int, int, int, int]] = []
     heater_surround_faces: list[tuple[int, int, int, int]] = []
     opposite_faces: list[tuple[int, int, int, int]] = []
+    supply_vent_faces: list[tuple[int, int, int, int]] = []
+    exhaust_vent_faces: list[tuple[int, int, int, int]] = []
 
     heater_y_range = (y0, y1)
     heater_z_range = (z0, z1)
+
+    # Ventilation vent placement: supply on x=0 wall (lowest y, first z segment),
+    # exhaust on opposite wall (highest y, first z segment).
+    vent_enabled = ventilation is not None
+    # Pick the first z-segment center for vent placement
+    supply_vent_seg: tuple[int, int] | None = None
+    exhaust_vent_seg: tuple[int, int] | None = None
+    if vent_enabled:
+        # Supply vent: lowest y-segment, first z-segment on x=0 wall
+        supply_vent_seg = (0, 0)
+        # Exhaust vent: highest y-segment, first z-segment on opposite wall
+        exhaust_vent_seg = (len(y_points) - 2, 0)
 
     for y_idx in range(len(y_points) - 1):
         for z_idx in range(len(z_points) - 1):
@@ -152,13 +170,23 @@ def _build_block_mesh_context(geometry: dict, boundary_conditions: dict) -> dict
             })
 
             x0_face = (v0, v4, v7, v3)
-            opposite_faces.append((v1, v2, v6, v5))
+            opp_face = (v1, v2, v6, v5)
 
+            # Classify opposite wall face (exhaust vent or normal)
+            if exhaust_vent_seg == (y_idx, z_idx):
+                exhaust_vent_faces.append(opp_face)
+            else:
+                opposite_faces.append(opp_face)
+
+            # Classify x=0 wall face (heater, supply vent, or surround)
             segment_y = (y_points[y_idx], y_points[y_idx + 1])
             segment_z = (z_points[z_idx], z_points[z_idx + 1])
             is_heater_face = segment_y == heater_y_range and segment_z == heater_z_range
+
             if is_heater_face:
                 heater_faces.append(x0_face)
+            elif supply_vent_seg == (y_idx, z_idx):
+                supply_vent_faces.append(x0_face)
             else:
                 heater_surround_faces.append(x0_face)
 
@@ -171,7 +199,7 @@ def _build_block_mesh_context(geometry: dict, boundary_conditions: dict) -> dict
             if z_idx == len(z_points) - 2:
                 back_faces.append((v4, v5, v6, v7))
 
-    return {
+    result = {
         **mesh,
         "heater_area": round(height * width, 6),
         "heater_y0": round(y0, 6),
@@ -188,6 +216,10 @@ def _build_block_mesh_context(geometry: dict, boundary_conditions: dict) -> dict
         "front_faces": front_faces,
         "back_faces": back_faces,
     }
+    if vent_enabled:
+        result["supply_vent_faces"] = supply_vent_faces
+        result["exhaust_vent_faces"] = exhaust_vent_faces
+    return result
 
 
 def compute_mesh_params(geometry: dict) -> dict:
@@ -329,7 +361,13 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     output_dir.mkdir(parents=True)
 
     # Build template context
-    mesh = _build_block_mesh_context(data["geometry"], data["boundary_conditions"])
+    vent_cfg = data.get("ventilation")
+    vent_enabled = vent_cfg is not None and vent_cfg.get("model", "none") != "none"
+    mesh = _build_block_mesh_context(
+        data["geometry"],
+        data["boundary_conditions"],
+        ventilation=vent_cfg if vent_enabled else None,
+    )
     heater = compute_heater_params(data["boundary_conditions"], data["geometry"])
     solver = data["solver"]
     probes = _build_probe_context(data.get("probes", []))
@@ -383,6 +421,8 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "buoyancy_production": buoyancy_production,
         "species_transport": species_transport,
         "radiation_model": radiation_model,
+        "ventilation": vent_enabled,
+        "T_ambient": vent_cfg.get("T_ambient", 293.15) if vent_enabled else 293.15,
     }
 
     # Skip vapor field template for pure mixture cases

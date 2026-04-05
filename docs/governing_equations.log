@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999995 (MiKTeX 24.1) (preloaded format=xelatex 2026.4.4)  4 APR 2026 11:22
+This is XeTeX, Version 3.141592653-2.6-0.999995 (MiKTeX 24.1) (preloaded format=xelatex 2026.4.4)  5 APR 2026 16:23
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -498,93 +498,114 @@ Package: enumitem 2025/02/06 v3.11 Customized lists
 \enit@inbox=\box57
 \enit@count@id=\count318
 \enitdp@description=\count319
+) (C:\Users\tgch1\AppData\Local\Programs\MiKTeX\tex/latex/tools\tabularx.sty
+Package: tabularx 2023/07/08 v2.11c `tabularx' package (DPC)
+
+(C:\Users\tgch1\AppData\Local\Programs\MiKTeX\tex/latex/tools\array.sty
+Package: array 2023/10/16 v2.5g Tabular extension package (FMi)
+\col@sep=\dimen265
+\ar@mcellbox=\box58
+\extrarowheight=\dimen266
+\NC@list=\toks26
+\extratabsurround=\skip77
+\backup@length=\skip78
+\ar@cellbox=\box59
 )
-Package hyperref Info: Option `colorlinks' set `true' on input line 21.
- (governing_equations.aux)
+\TX@col@width=\dimen267
+\TX@old@table=\dimen268
+\TX@old@col=\dimen269
+\TX@target=\dimen270
+\TX@delta=\dimen271
+\TX@cols=\count320
+\TX@ftn=\toks27
+)
+Package hyperref Info: Option `colorlinks' set `true' on input line 27.
+
+(governing_equations.aux)
 \openout1 = `governing_equations.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 33.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 39.
 LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 3
-3.
+9.
 
 (C:\Users\tgch1\AppData\Local\Programs\MiKTeX\tex/latex/base\ts1cmr.fd
 File: ts1cmr.fd 2023/04/13 v2.5m Standard LaTeX font definitions
 )
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 39.
+LaTeX Font Info:    ... okay on input line 39.
 
 Package fontspec Info: Adjusting the maths setup (use [no-math] to avoid
 (fontspec)             this).
 
 \symlegacymaths=\mathgroup6
 LaTeX Font Info:    Overwriting symbol font `legacymaths' in version `bold'
-(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 33.
-LaTeX Font Info:    Redeclaring math accent \acute on input line 33.
-LaTeX Font Info:    Redeclaring math accent \grave on input line 33.
-LaTeX Font Info:    Redeclaring math accent \ddot on input line 33.
-LaTeX Font Info:    Redeclaring math accent \tilde on input line 33.
-LaTeX Font Info:    Redeclaring math accent \bar on input line 33.
-LaTeX Font Info:    Redeclaring math accent \breve on input line 33.
-LaTeX Font Info:    Redeclaring math accent \check on input line 33.
-LaTeX Font Info:    Redeclaring math accent \hat on input line 33.
-LaTeX Font Info:    Redeclaring math accent \dot on input line 33.
-LaTeX Font Info:    Redeclaring math accent \mathring on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Delta on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Theta on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Xi on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Pi on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Phi on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Psi on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \Omega on input line 33.
-LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 33.
-LaTeX Font Info:    Redeclaring symbol font `operators' on input line 33.
+(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 39.
+LaTeX Font Info:    Redeclaring math accent \acute on input line 39.
+LaTeX Font Info:    Redeclaring math accent \grave on input line 39.
+LaTeX Font Info:    Redeclaring math accent \ddot on input line 39.
+LaTeX Font Info:    Redeclaring math accent \tilde on input line 39.
+LaTeX Font Info:    Redeclaring math accent \bar on input line 39.
+LaTeX Font Info:    Redeclaring math accent \breve on input line 39.
+LaTeX Font Info:    Redeclaring math accent \check on input line 39.
+LaTeX Font Info:    Redeclaring math accent \hat on input line 39.
+LaTeX Font Info:    Redeclaring math accent \dot on input line 39.
+LaTeX Font Info:    Redeclaring math accent \mathring on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Delta on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Theta on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Xi on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Pi on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Phi on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Psi on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \Omega on input line 39.
+LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 39.
+LaTeX Font Info:    Redeclaring symbol font `operators' on input line 39.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `normal' on input line 33.
+(Font)              `operators' in the math version `normal' on input line 39.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
-(Font)                  OT1/cmr/m/n --> TU/lmr/m/n on input line 33.
+(Font)                  OT1/cmr/m/n --> TU/lmr/m/n on input line 39.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `bold' on input line 33.
+(Font)              `operators' in the math version `bold' on input line 39.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
-(Font)                  OT1/cmr/bx/n --> TU/lmr/m/n on input line 33.
+(Font)                  OT1/cmr/bx/n --> TU/lmr/m/n on input line 39.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
-(Font)                  TU/lmr/m/n --> TU/lmr/m/n on input line 33.
+(Font)                  TU/lmr/m/n --> TU/lmr/m/n on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `normal'
-(Font)                  OT1/cmr/m/it --> TU/lmr/m/it on input line 33.
+(Font)                  OT1/cmr/m/it --> TU/lmr/m/it on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
-(Font)                  OT1/cmr/bx/n --> TU/lmr/b/n on input line 33.
+(Font)                  OT1/cmr/bx/n --> TU/lmr/b/n on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `normal'
-(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 33.
+(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 33.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 39.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
-(Font)                  TU/lmr/m/n --> TU/lmr/b/n on input line 33.
+(Font)                  TU/lmr/m/n --> TU/lmr/b/n on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
-(Font)                  OT1/cmr/bx/it --> TU/lmr/b/it on input line 33.
+(Font)                  OT1/cmr/bx/it --> TU/lmr/b/it on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `bold'
-(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 33.
+(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 39.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 33.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 39.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: xetex
@@ -594,16 +615,16 @@ LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
 * layout: <same size as paper>
 * layoutoffset:(h,v)=(0.0pt,0.0pt)
 * modes: 
-* h-part:(L,W,R)=(71.13188pt, 455.24411pt, 71.13188pt)
-* v-part:(T,H,B)=(71.13188pt, 702.78308pt, 71.13188pt)
+* h-part:(L,W,R)=(56.9055pt, 483.69687pt, 56.9055pt)
+* v-part:(T,H,B)=(56.9055pt, 731.23584pt, 56.9055pt)
 * \paperwidth=597.50787pt
 * \paperheight=845.04684pt
-* \textwidth=455.24411pt
-* \textheight=702.78308pt
-* \oddsidemargin=-1.1381pt
-* \evensidemargin=-1.1381pt
-* \topmargin=-38.1381pt
-* \headheight=12.0pt
+* \textwidth=483.69687pt
+* \textheight=731.23584pt
+* \oddsidemargin=-15.36449pt
+* \evensidemargin=-15.36449pt
+* \topmargin=-52.36449pt
+* \headheight=14.0pt
 * \headsep=25.0pt
 * \topskip=11.0pt
 * \footskip=30.0pt
@@ -620,18 +641,18 @@ LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-Package hyperref Info: Link coloring ON on input line 33.
+Package hyperref Info: Link coloring ON on input line 39.
 (governing_equations.out) (governing_equations.out)
 \@outlinefile=\write3
 \openout3 = `governing_equations.out'.
 
-LaTeX Font Info:    Trying to load font information for U+msa on input line 35.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 41.
 
 
 (C:\Users\tgch1\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 35.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 41.
 
 
 (C:\Users\tgch1\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
@@ -646,9 +667,9 @@ Missing character: There is no ε in font [lmroman10-regular]:mapping=tex-text;!
  [1
 
 ]
-Missing character: There is no ε in font [lmroman10-regular]:mapping=tex-text;!
+Underfull \hbox (badness 10000) in paragraph at lines 56--75
 
-LaTeX Warning: Command \textasciicircum invalid in math mode on input line 98.
+ []
 
 
 Package fontspec Info: Could not resolve font "Yu Gothic/I" (it probably
@@ -671,712 +692,9 @@ Package fontspec Info: Font family 'YuGothic(0)' created for font 'Yu Gothic'
 (fontspec)             Gothic/BI/OT:script=hani;language=dflt;"
 (fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.: 
 
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
 [2]
-Missing character: There is no ε in font [lmroman10-bold]:mapping=tex-text;!
-Missing character: There is no ε in font [lmroman10-bold]:mapping=tex-text;!
+Underfull \hbox (badness 10000) in paragraph at lines 198--213
 
-LaTeX Warning: Command \textasciicircum invalid in math mode on input line 149.
-
-
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[3]
-Missing character: There is no ┌ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┐ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no └ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┘ in font [lmmono10-regular]:!
-
-LaTeX Warning: Command \textasciicircum invalid in math mode on input line 217.
-
-
-! Missing $ inserted.
-<inserted text> 
-                $
-l.219 \begin{itemize} \item
-                            \underbrace{\frac{h\_{\text{wall}} \cdot P \cdot...
-I've inserted a begin-math/end-math symbol since I think
-you left one out. Proceed, with fingers crossed.
-
-! Missing \endgroup inserted.
-<inserted text> 
-                \endgroup 
-l.219 \begin{itemize} \item
-                            \underbrace{\frac{h\_{\text{wall}} \cdot P \cdot...
-I've inserted something that you may have forgotten.
-(See the <inserted text> above.)
-With luck, this will get me unwedged. But if you
-really didn't forget anything, try typing `2' now; then
-my insertion and my current dilemma will both disappear.
-
-! Undefined control sequence.
-\enit@itemize@i ...\enit@negwidth }\enit@keyfirst 
-                                                  \fi 
-l.219 \begin{itemize} \item
-                            \underbrace{\frac{h\_{\text{wall}} \cdot P \cdot...
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-
-! LaTeX Error: Lonely \item--perhaps a missing list environment.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.219 \begin{itemize} \item \underbrace
-                                       {\frac{h\_{\text{wall}} \cdot P \cdot...
-
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-
-Underfull \hbox (badness 10000) detected at line 219
-[][]
  []
 
-! Missing $ inserted.
-<inserted text> 
-                $
-l.219 ...i - T\_{\text{wall}})}{V\_{\text{cell}}}}
-                                                  \_{\text{壁面熱損失}} \end{item...
-I've inserted a begin-math/end-math symbol since I think
-you left one out. Proceed, with fingers crossed.
-
-! Undefined control sequence.
-\enit@enditemize ->\enit@after 
-                               \endlist \ifx \enit@series \relax \else \ifnu...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-
-! LaTeX Error: Command \end{document} invalid in math mode.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-
-! LaTeX Error: Something's wrong--perhaps a missing \item.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-
-! LaTeX Error: Something's wrong--perhaps a missing \item.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-! Undefined control sequence.
-\enit@enditemize ...x \else \ifnum \enit@resuming 
-                                                  =\@ne \enit@setresumekeys ...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Missing number, treated as zero.
-<to be read again> 
-                   =
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-A number should have been here; I inserted `0'.
-(If you can't figure out why I needed to see a number,
-look up `weird error' in the index to The TeXbook.)
-
-! Undefined control sequence.
-\enit@setresumekeys ...xpandafter {\enit@savekeys 
-                                                  }\xdef \enit@afterlist {#2...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Undefined control sequence.
-\enit@setresumekeys ...it@toks }\ifnum \enit@type 
-                                                  =\z@ #3\def \enit@noexcs {...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Missing number, treated as zero.
-<to be read again> 
-                   =
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-A number should have been here; I inserted `0'.
-(If you can't figure out why I needed to see a number,
-look up `weird error' in the index to The TeXbook.)
-
-! Undefined control sequence.
-<argument> enit@resume@series@\enit@series 
-                                           
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Undefined control sequence.
-\enit@setresumekeys ...me@#1}{\csname c@\@listctr 
-                                                  \endcsname \the \csname c@...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Undefined control sequence.
-\enit@setresumekeys ...e \the \csname c@\@listctr 
-                                                  \endcsname }\fi }
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! You can't use `\relax' after \the.
-<recently read> \c@ 
-                    
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-I'm forgetting what you said and using zero instead.
-
-! Undefined control sequence.
-\enit@enditemize ...ist \fi \ifnum \enit@resuming 
-                                                  =\thr@@ \enit@setresumekey...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Missing number, treated as zero.
-<to be read again> 
-                   =
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-A number should have been here; I inserted `0'.
-(If you can't figure out why I needed to see a number,
-look up `weird error' in the index to The TeXbook.)
-
-! Undefined control sequence.
-\enit@setresumekeys ...xpandafter {\enit@savekeys 
-                                                  }\xdef \enit@afterlist {#2...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Undefined control sequence.
-\enit@setresumekeys ...it@toks }\ifnum \enit@type 
-                                                  =\z@ #3\def \enit@noexcs {...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Missing number, treated as zero.
-<to be read again> 
-                   =
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-A number should have been here; I inserted `0'.
-(If you can't figure out why I needed to see a number,
-look up `weird error' in the index to The TeXbook.)
-
-! Undefined control sequence.
-\enit@setresumekeys ...me@#1}{\csname c@\@listctr 
-                                                  \endcsname \the \csname c@...
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! Undefined control sequence.
-\enit@setresumekeys ...e \the \csname c@\@listctr 
-                                                  \endcsname }\fi }
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-The control sequence at the end of the top line
-of your error message was never \def'ed. If you have
-misspelled it (e.g., `\hobx'), type `I' and the correct
-spelling (e.g., `I\hbox'). Otherwise just continue,
-and I'll forget about whatever was undefined.
-
-! You can't use `\relax' after \the.
-<recently read> \c@ 
-                    
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-I'm forgetting what you said and using zero instead.
-
-
-! LaTeX Error: \begin{document} ended by \end{itemize}.
-
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-Your command was ignored.
-Type  I <command> <return>  to replace it with another command,
-or  <return>  to continue without it.
-
-! Missing $ inserted.
-<inserted text> 
-                $
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-I've inserted something that you may have forgotten.
-(See the <inserted text> above.)
-With luck, this will get me unwedged. But if you
-really didn't forget anything, try typing `2' now; then
-my insertion and my current dilemma will both disappear.
-
-! Extra \endgroup.
-<recently read> \endgroup 
-                          
-l.219 ...xt{cell}}}}\_{\text{壁面熱損失}} \end{itemize}
-                                                  
-Things are pretty mixed up, but I think the worst is over.
-
-! Missing $ inserted.
-<inserted text> 
-                $
-l.221 
-      
-I've inserted a begin-math/end-math symbol since I think
-you left one out. Proceed, with fingers crossed.
-
-! Missing } inserted.
-<inserted text> 
-                }
-l.221 
-      
-I've inserted something that you may have forgotten.
-(See the <inserted text> above.)
-With luck, this will get me unwedged. But if you
-really didn't forget anything, try typing `2' now; then
-my insertion and my current dilemma will both disappear.
-
-! Too many }'s.
-\@par ... \@noitemerr {\@@par }\fi \else {\@@par }
-                                                  \fi 
-l.221 
-      
-You've closed more groups than you opened.
-Such booboos are generally harmless, so keep going.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 231.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `subscript' on input line 231.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 231.
-
-
-LaTeX Warning: Command \textasciicircum invalid in math mode on input line 239.
-
-
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[4]
-Missing character: There is no ┌ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┐ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no ┌ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┐ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[5]
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no └ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┘ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no └ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┘ in font [lmmono10-regular]:!
-
-Overfull \hbox (76.74583pt too wide) in paragraph at lines 322--339
- [][] 
- []
-
-
-LaTeX Warning: Command \textasciicircum invalid in math mode on input line 343.
-
-
-
-Overfull \hbox (66.61958pt too wide) in paragraph at lines 350--355
-[]$[] [][] \OT1/cmr/m/n/10.95 = [] [][] + [] [][]$ 
- []
-
-Missing character: There is no ┌ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┼ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┐ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[6]
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no │ in font [lmmono10-regular]:!
-Missing character: There is no └ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┼ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ─ in font [lmmono10-regular]:!
-Missing character: There is no ┘ in font [lmmono10-regular]:!
-
-Overfull \hbox (31.81001pt too wide) in paragraph at lines 383--400
- [][] 
- []
-
-Missing character: There is no ε in font [lmmono10-regular]:!
-Missing character: There is no ρ in font [lmmono10-regular]:!
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-! Extra alignment tab has been changed to \cr.
-<recently read> \endtemplate 
-                             
-l.486 収束判定 & max &
-                   T\textasciicircum{}{n+1} - T\textasciicircum{}n & < 1e-6 \\
-You have given more \span or & marks than there were
-in the preamble to the \halign or \valign now in progress.
-So I'll assume that you meant to type \cr instead.
-
-Missing character: There is no ∈ in font [lmroman10-regular]:mapping=tex-text;!
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[7]
-Missing character: There is no ⁻ in font [lmroman10-regular]:mapping=tex-text;!
-Missing character: There is no ⁵ in font [lmroman10-regular]:mapping=tex-text;!
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-Missing character: There is no ε in font [lmroman10-regular]:mapping=tex-text;!
-
-Overfull \hbox (150.34232pt too wide) in paragraph at lines 545--562
- [][] 
- []
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[8]
-Overfull \hbox (44.1191pt too wide) in paragraph at lines 585--598
- [][] 
- []
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[9]
-
-Package fancyhdr Warning: \headheight is too small (12.0pt): 
-(fancyhdr)                Make it at least 13.59999pt, for example:
-(fancyhdr)                \setlength{\headheight}{13.59999pt}.
-(fancyhdr)                You might also make \topmargin smaller:
-(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
-
-[10] (governing_equations.aux)
- ***********
-LaTeX2e <2023-11-01> patch level 1
-L3 programming layer <2022/08/05>
- ***********
-Package rerunfilecheck Info: File `governing_equations.out' has not changed.
-(rerunfilecheck)             Checksum: 0CA4D0D430140F2D6EB866CC8ED202C0;5213.
- ) 
-Here is how much of TeX's memory you used:
- 15358 strings out of 409617
- 315872 string characters out of 5774014
- 1950191 words of memory out of 5000000
- 37266 multiletter control sequences out of 15000+600000
- 565444 words of font info for 96 fonts, out of 8000000 for 9000
- 1348 hyphenation exceptions out of 8191
- 79i,13n,93p,325b,1049s stack positions out of 10000i,1000n,20000p,200000b,200000s
-
-Output written on governing_equations.pdf (10 pages).
+[3

@@ -22,4 +22,18 @@ boundaryField
         type            fixedValue;
         value           uniform {{ Y_H2O_heater | default(0.01) }};
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            inletOutlet;
+        inletValue      uniform {{ Y_H2O_initial | default(0.01) }};
+        value           uniform {{ Y_H2O_initial | default(0.01) }};
+    }
+    exhaust_vent
+    {
+        type            inletOutlet;
+        inletValue      uniform {{ Y_H2O_initial | default(0.01) }};
+        value           uniform {{ Y_H2O_initial | default(0.01) }};
+    }
+{% endif %}
 }

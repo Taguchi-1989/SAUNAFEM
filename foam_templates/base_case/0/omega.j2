@@ -17,4 +17,15 @@ boundaryField
         type            omegaWallFunction;
         value           uniform 5.0;
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            fixedValue;
+        value           uniform 5.0;
+    }
+    exhaust_vent
+    {
+        type            zeroGradient;
+    }
+{% endif %}
 }
