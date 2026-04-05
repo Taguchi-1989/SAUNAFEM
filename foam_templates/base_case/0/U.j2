@@ -16,4 +16,16 @@ boundaryField
     {
         type            noSlip;
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+    exhaust_vent
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+{% endif %}
 }

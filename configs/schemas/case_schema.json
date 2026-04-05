@@ -165,6 +165,24 @@
         "additionalProperties": false
       }
     },
+    "ventilation": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["none", "supply_exhaust"],
+          "default": "none",
+          "description": "Ventilation model: none=sealed room, supply_exhaust=supply+exhaust vents"
+        },
+        "T_ambient": {
+          "type": "number",
+          "description": "Ambient air temperature at supply vent [K]",
+          "default": 293.15
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
     "aufguss": {
       "type": "object",
       "properties": {

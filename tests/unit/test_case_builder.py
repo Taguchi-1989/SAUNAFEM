@@ -255,6 +255,172 @@ class TestMultiComponentMixture:
         assert not (out / "0" / "H2O").exists()
 
 
+class TestVentilationTemplate:
+    """Tests for ventilation supply/exhaust vent patches."""
+
+    _TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "foam_templates" / "base_case"
+
+    def _minimal_context(self, ventilation: bool = False) -> dict:
+        """Build a minimal context dict for template rendering."""
+        ctx = {
+            "dim_x": 3.0,
+            "dim_y": 2.5,
+            "dim_z": 2.5,
+            "nx": 24,
+            "ny": 20,
+            "nz": 20,
+            "heater_area": 0.3,
+            "heater_y0": 0.1,
+            "heater_y1": 0.6,
+            "heater_z0": 0.95,
+            "heater_z1": 1.55,
+            "vertices": [(0, 0, 0), (3, 0, 0), (3, 2.5, 0), (0, 2.5, 0),
+                         (0, 0, 2.5), (3, 0, 2.5), (3, 2.5, 2.5), (0, 2.5, 2.5)],
+            "blocks": [{"vertices": (0, 1, 2, 3, 4, 5, 6, 7), "cells": (24, 20, 20)}],
+            "floor_faces": [(0, 1, 5, 4)],
+            "ceiling_faces": [(3, 7, 6, 2)],
+            "heater_faces": [(0, 4, 7, 3)],
+            "heater_surround_faces": [],
+            "opposite_faces": [(1, 2, 6, 5)],
+            "front_faces": [(0, 3, 2, 1)],
+            "back_faces": [(4, 5, 6, 7)],
+            "heat_flux": 30000.0,
+            "heater_width": 0.6,
+            "heater_height": 0.5,
+            "T_walls": 293.15,
+            "T_initial": 293.15,
+            "T_ambient": 293.15,
+            "solver_name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+            "probes": [],
+            "mixture_type": "pure",
+            "Y_H2O_initial": 0.01,
+            "Y_H2O_heater": 0.01,
+            "aufguss_enabled": False,
+            "aufguss_jet_velocity": 0.0,
+            "aufguss_duration": 1.0,
+            "ventilation": ventilation,
+        }
+        if ventilation:
+            ctx["supply_vent_faces"] = [(0, 4, 7, 3)]
+            ctx["exhaust_vent_faces"] = [(1, 2, 6, 5)]
+        return ctx
+
+    def test_no_vent_patches_by_default(self, tmp_path: Path) -> None:
+        """Ventilation disabled: no supply_vent or exhaust_vent in output."""
+        ctx = self._minimal_context(ventilation=False)
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        mesh = (tmp_path / "system" / "blockMeshDict").read_text(encoding="utf-8")
+        assert "supply_vent" not in mesh
+        assert "exhaust_vent" not in mesh
+
+        u_file = (tmp_path / "0" / "U").read_text(encoding="utf-8")
+        assert "supply_vent" not in u_file
+
+    def test_vent_patches_when_enabled(self, tmp_path: Path) -> None:
+        """Ventilation enabled: supply_vent and exhaust_vent appear in all fields."""
+        ctx = self._minimal_context(ventilation=True)
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+
+        mesh = (tmp_path / "system" / "blockMeshDict").read_text(encoding="utf-8")
+        assert "supply_vent" in mesh
+        assert "exhaust_vent" in mesh
+        assert "type patch;" in mesh
+
+        for field in ["U", "T", "p_rgh", "p", "k", "omega", "nut", "alphat"]:
+            content = (tmp_path / "0" / field).read_text(encoding="utf-8")
+            assert "supply_vent" in content, f"supply_vent missing in {field}"
+            assert "exhaust_vent" in content, f"exhaust_vent missing in {field}"
+
+    def test_vent_bc_types(self, tmp_path: Path) -> None:
+        """Verify correct BC types for vent patches."""
+        ctx = self._minimal_context(ventilation=True)
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+
+        u_file = (tmp_path / "0" / "U").read_text(encoding="utf-8")
+        assert "pressureInletOutletVelocity" in u_file
+
+        p_rgh_file = (tmp_path / "0" / "p_rgh").read_text(encoding="utf-8")
+        assert "totalPressure" in p_rgh_file
+
+        t_file = (tmp_path / "0" / "T").read_text(encoding="utf-8")
+        assert "inletOutlet" in t_file
+
+    def test_build_case_no_ventilation_default(
+        self, sample_case_path: Path, tmp_path: Path
+    ) -> None:
+        """Full build_case with no ventilation key produces no vent patches."""
+        out = tmp_path / "test_case"
+        build_case(sample_case_path, output_dir=out)
+        mesh = (out / "system" / "blockMeshDict").read_text(encoding="utf-8")
+        assert "supply_vent" not in mesh
+        assert "exhaust_vent" not in mesh
+
+    def test_build_case_with_ventilation(self, tmp_path: Path) -> None:
+        """Full build_case with ventilation config produces vent patches."""
+        data = {
+            "case": {
+                "name": "vent_test",
+                "description": "Ventilation test",
+                "type": "steady",
+            },
+            "geometry": {
+                "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+                "mesh_level": "M0",
+            },
+            "boundary_conditions": {
+                "walls": {
+                    "temperature": 293.15,
+                    "type": "mixed",
+                    "model": "lumped",
+                    "thickness": 0.015,
+                    "conductivity": 0.12,
+                    "rho_cp": 500000,
+                },
+                "heater": {
+                    "power_kw": 18.0,
+                    "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                    "width": 0.6,
+                    "height": 0.5,
+                },
+            },
+            "ventilation": {
+                "model": "supply_exhaust",
+                "T_ambient": 288.15,
+            },
+            "solver": {
+                "name": "buoyantPimpleFoam",
+                "end_time": 300,
+                "write_interval": 10,
+                "delta_t": 0.05,
+                "averaging_start": 150,
+            },
+            "probes": [
+                {
+                    "name": "upper_bench",
+                    "position": {"x": 1.5, "y": 2.0, "z": 1.25},
+                    "fields": ["T"],
+                },
+            ],
+        }
+        yaml_path = tmp_path / "vent_case.yaml"
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+        out = tmp_path / "case_out"
+        build_case(yaml_path, output_dir=out)
+
+        mesh = (out / "system" / "blockMeshDict").read_text(encoding="utf-8")
+        assert "supply_vent" in mesh
+        assert "exhaust_vent" in mesh
+
+        t_file = (out / "0" / "T").read_text(encoding="utf-8")
+        assert "supply_vent" in t_file
+        assert "288.15" in t_file
+
+
 class TestAufgussTemplate:
     """Tests for Aufguss jet momentum source fvOptions template."""
 

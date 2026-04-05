@@ -17,4 +17,18 @@ boundaryField
         type            fixedFluxPressure;
         value           uniform 0;
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            totalPressure;
+        p0              uniform 0;
+        value           uniform 0;
+    }
+    exhaust_vent
+    {
+        type            totalPressure;
+        p0              uniform 0;
+        value           uniform 0;
+    }
+{% endif %}
 }

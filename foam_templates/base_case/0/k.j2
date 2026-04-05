@@ -17,4 +17,15 @@ boundaryField
         type            kqRWallFunction;
         value           uniform 0.1;
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            fixedValue;
+        value           uniform 0.1;
+    }
+    exhaust_vent
+    {
+        type            zeroGradient;
+    }
+{% endif %}
 }

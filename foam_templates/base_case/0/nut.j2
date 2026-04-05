@@ -17,4 +17,16 @@ boundaryField
         type            nutkWallFunction;
         value           uniform 0;
     }
+{% if ventilation | default(false) %}
+    supply_vent
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+    exhaust_vent
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+{% endif %}
 }
