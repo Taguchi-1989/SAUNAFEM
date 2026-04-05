@@ -58,7 +58,10 @@ def time_average(
     """Compute time-averaged value over a window.
 
     If start/end are None, averages over the full range.
+    Returns 0.0 for empty inputs.
     """
+    if len(times) == 0 or len(values) == 0:
+        return 0.0
     if start is None:
         start = times[0]
     if end is None:
@@ -66,7 +69,13 @@ def time_average(
     mask = (times >= start) & (times <= end)
     if not np.any(mask):
         return float(np.mean(values))
-    return float(np.mean(values[mask]))
+    masked_t = times[mask]
+    masked_v = values[mask]
+    # Use trapezoidal integration for proper time-weighting
+    if len(masked_t) > 1 and (masked_t[-1] - masked_t[0]) > 1e-10:
+        _trapezoid = getattr(np, "trapezoid", np.trapz)
+        return float(_trapezoid(masked_v, masked_t) / (masked_t[-1] - masked_t[0]))
+    return float(np.mean(masked_v))
 
 
 def compare_probes(

@@ -203,7 +203,7 @@ def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, 
     lambda_vapor = 0.025  # W/(m*K) at ~370K (slightly less than air)
 
     # Mixture properties (mass-weighted)
-    w = humidity_ratio
+    w = max(0.0, humidity_ratio)
     y_vapor = w / (1.0 + w)  # vapor mass fraction
     cp_mix = cp_air * (1.0 - y_vapor) + cp_vapor * y_vapor
     lambda_mix = lambda_air * (1.0 - y_vapor) + lambda_vapor * y_vapor
@@ -822,7 +822,7 @@ def solve_transient(
         # Lumped wall temperature evolution
         if wall_cfg == "lumped" and wall_mass_cp > 0:
             q_to_wall = q_wall_upper + q_wall_lower
-            q_rad_wall = q_rad_to_walls * (1.0 - f_rad_lower)
+            q_rad_wall = q_rad_to_walls  # all radiation heats walls
             q_out = wall_lambda / wall_thickness * a_wall_total * (t_wall_inner - t_wall)
             dt_wall = (q_to_wall + q_rad_wall - q_out) / wall_mass_cp
             t_wall_inner += dt_step * dt_wall

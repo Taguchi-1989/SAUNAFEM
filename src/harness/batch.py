@@ -97,7 +97,12 @@ def run_batch(
     cases: list[BatchCaseResult] = []
 
     for yaml_path in case_yamls:
-        result = solve_two_zone(yaml_path, n_profile=n_profile, max_iter=max_iter)
+        try:
+            result = solve_two_zone(yaml_path, n_profile=n_profile, max_iter=max_iter)
+        except Exception as exc:
+            import sys
+            print(f"WARNING: Skipping {yaml_path.name}: {exc}", file=sys.stderr)
+            continue
 
         kpis = evaluate_all_kpis(
             probe_values=result.probe_values,

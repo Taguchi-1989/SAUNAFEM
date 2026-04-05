@@ -136,7 +136,8 @@
         "time": {"type": "number", "minimum": 0, "description": "Time when water is poured [s]"},
         "tau_evap": {"type": "number", "minimum": 0.1, "default": 5.0, "description": "Evaporation time constant [s]"}
       },
-      "required": ["water_ml"]
+      "required": ["water_ml"],
+      "additionalProperties": false
     },
     "probes": {
       "type": "array",
@@ -172,7 +173,8 @@
         "duration": {"type": "number", "minimum": 0, "default": 30.0, "description": "Aufguss duration [s]"},
         "jet_velocity": {"type": "number", "minimum": 0, "default": 2.0, "description": "Jet velocity for OpenFOAM momentum source [m/s]"}
       },
-      "required": ["beta_aug"]
+      "required": ["beta_aug"],
+      "additionalProperties": false
     },
     "validation": {
       "type": "object",
@@ -183,7 +185,8 @@
           "additionalProperties": {"type": "number"},
           "description": "Per-probe tolerance in K"
         }
-      }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false
