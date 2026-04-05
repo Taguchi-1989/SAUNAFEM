@@ -370,7 +370,7 @@ class TestTransientSolver:
         (tmp_path / "dry").mkdir()
         (tmp_path / "wet").mkdir()
         dry_path = _write_case_yaml(tmp_path / "dry")
-        wet_path = _write_loyly_yaml(tmp_path / "wet", water_ml=500)
+        wet_path = _write_loyly_yaml(tmp_path / "wet", water_ml=1000)
 
         # Get dry steady-state reference
         dry_steady = solve_two_zone(dry_path, max_iter=10000)

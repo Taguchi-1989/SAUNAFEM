@@ -137,11 +137,13 @@ def _plume_entrainment(
     rho_amb: float = 1.1,
     cp: float = 1005.0,
     g: float = 9.81,
+    heater_diameter: float = 0.5,
 ) -> tuple[float, float]:
     """MTT plume entrainment model.
 
     Computes plume mass flow rate and temperature at height z above
-    the virtual origin using Zukoski's correlation.
+    the heater center using Zukoski's correlation with Heskestad's
+    virtual origin correction for finite-diameter sources.
 
     Args:
         q_conv_w: Convective heat release rate [W].
@@ -150,6 +152,7 @@ def _plume_entrainment(
         rho_amb: Ambient air density [kg/m3].
         cp: Specific heat [J/(kg*K)].
         g: Gravitational acceleration [m/s2].
+        heater_diameter: Heater characteristic diameter [m].
 
     Returns:
         (m_dot, t_plume): Mass flow rate [kg/s] and plume temperature [K].
@@ -157,11 +160,17 @@ def _plume_entrainment(
     if z <= 0.01 or q_conv_w <= 0:
         return 0.0, t_amb
 
+    # Heskestad virtual origin correction for finite-diameter sources
+    # z_0 = -1.02 * D + 0.083 * Q_kw^(2/5)
+    # z_0 is typically negative for small heaters, making z_eff > z
+    q_kw = q_conv_w / 1000.0
+    z_0 = -1.02 * heater_diameter + 0.083 * q_kw ** 0.4
+    z_eff = max(0.01, z - z_0)
+
     # Zukoski plume correlation:
     # m_dot = 0.071 * Q_c^(1/3) * z^(5/3) + 0.0018 * Q_c
     # (Q_c in kW, z in m, m_dot in kg/s)
-    q_kw = q_conv_w / 1000.0
-    m_dot = 0.071 * q_kw ** (1.0 / 3.0) * z ** (5.0 / 3.0) + 0.0018 * q_kw
+    m_dot = 0.071 * q_kw ** (1.0 / 3.0) * z_eff ** (5.0 / 3.0) + 0.0018 * q_kw
 
     # Plume temperature from energy balance: Q = m_dot * cp * (T_plume - T_amb)
     t_plume = t_amb + q_conv_w / (m_dot * cp) if m_dot > 0.001 else t_amb + 100.0
@@ -405,6 +414,9 @@ def solve_two_zone(
         aufguss_start = 0.0
         aufguss_duration = 0.0
 
+    # Heater characteristic diameter for virtual origin correction
+    heater_width = heater.get("width", 0.6)
+
     # Convective fraction of heater output (rest is radiant to walls)
     f_conv = 0.7
     q_conv = power_w * f_conv
@@ -467,7 +479,9 @@ def solve_two_zone(
 
         # Plume at interface height
         z_plume = max(0.01, z_int - heater_center_y)
-        m_plume, t_plume = _plume_entrainment(q_conv, z_plume, t_lower)
+        m_plume, t_plume = _plume_entrainment(
+            q_conv, z_plume, t_lower, heater_diameter=heater_width,
+        )
 
         # --- Humidity-dependent properties ---
         props = _humid_air_properties(t_upper, humidity_ratio)
@@ -535,7 +549,12 @@ def solve_two_zone(
         v_plume_flow = m_plume / max(rho_upper, 0.5)
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
-        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
+
+        # Aufguss mass exchange: bidirectional mixing moves beta_aug kg/s
+        # in each direction. Net volume effect from density difference:
+        v_mix = beta_aug * (1.0 / max(rho_lower, 0.5) - 1.0 / max(rho_upper, 0.5))
+
+        dz_int = (-v_plume_flow + v_return - v_steam + v_mix) / a_floor
         z_int += dt * dz_int
 
         # Clamp
@@ -669,6 +688,9 @@ def solve_transient(
         aufguss_start = 0.0
         aufguss_duration = 0.0
 
+    # Heater characteristic diameter for virtual origin correction
+    heater_width = heater.get("width", 0.6)
+
     f_conv = 0.7
     q_conv = power_w * f_conv
 
@@ -751,7 +773,9 @@ def solve_transient(
 
         # Plume at interface height
         z_plume = max(0.01, z_int - heater_center_y)
-        m_plume, t_plume = _plume_entrainment(q_conv, z_plume, t_lower)
+        m_plume, t_plume = _plume_entrainment(
+            q_conv, z_plume, t_lower, heater_diameter=heater_width,
+        )
 
         # Humidity-dependent properties
         props = _humid_air_properties(t_upper, humidity_ratio)
@@ -812,7 +836,15 @@ def solve_transient(
         v_plume_flow = m_plume / max(rho_upper, 0.5)
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
-        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
+
+        # Aufguss mass exchange: bidirectional mixing moves beta_aug kg/s
+        # in each direction (only active during Aufguss window).
+        if beta_aug > 0 and aufguss_start <= current_time <= aufguss_start + aufguss_duration:
+            v_mix = beta_aug * (1.0 / max(rho_lower, 0.5) - 1.0 / max(rho_upper, 0.5))
+        else:
+            v_mix = 0.0
+
+        dz_int = (-v_plume_flow + v_return - v_steam + v_mix) / a_floor
         z_int += dt_step * dz_int
 
         # Clamp

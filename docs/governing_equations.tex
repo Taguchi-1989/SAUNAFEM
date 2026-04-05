@@ -276,8 +276,25 @@ Zukoski のプルーム相関式に基づく。
 ヒーター中心から高さ $z$ の位置におけるプルーム質量流量:
 
 $
-\dot{m}_p(z) = 0.071 \, Q_c^{1/3} \, z^{5/3} + 0.0018 \, Q_c
+\dot{m}_p(z_{\text{eff}}) = 0.071 \, Q_c^{1/3} \, z_{\text{eff}}^{5/3} + 0.0018 \, Q_c
 $
+
+ここで $z_{\text{eff}}$ は Heskestad の仮想原点補正を適用した有効高さ:
+
+$
+z_0 = -1.02 \, D + 0.083 \, Q_c^{2/5}
+$
+
+$
+z_{\text{eff}} = \max(0.01, \; z - z_0)
+$
+
+\begin{itemize} \item $D$: ヒーター特性直径 [m] (YAML の \texttt{heater.width}) \end{itemize}
+\begin{itemize} \item $z_0$: 仮想原点オフセット [m] (小型ヒーターでは通常負 → $z_{\text{eff}} > z$) \end{itemize}
+
+Zukoski 相関は点源に対して導出されたため、有限径 $D$ のヒーターには
+Heskestad (1984) の仮想原点補正が必要。これにより、実効プルーム高さが
+幾何学的高さより大きくなり、エントレインメント量が適切に増加する。
 
 ここで:
 
@@ -330,19 +347,32 @@ $
 
 $
 A_{\text{floor}} \, \frac{dz_{\text{int}}}{dt}
-= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}}
+= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}} + \dot{V}_{\text{mix}}
 $
 
 ここで:
 
 \begin{itemize} \item $\dot{m}_p / \rho_{\text{upper}}$: プルームが上層に供給する体積流量（界面を押し下げる） \end{itemize}
 \begin{itemize} \item $\dot{V}_{\text{return}}$: 壁面沿い下降流による体積流量（界面を押し上げる） \end{itemize}
+\begin{itemize} \item $\dot{V}_{\text{steam}}$: ロウリュ蒸気による上層体積膨張（界面を押し下げる） \end{itemize}
+\begin{itemize} \item $\dot{V}_{\text{mix}}$: アウフグース双方向質量交換による正味体積効果 \end{itemize}
 
 $
 \dot{V}_{\text{return}} = \frac{h_{\text{wall}} \, A_{\text{wall,upper}} \, (T_{\text{upper}} - T_{\text{wall}})}{\rho_{\text{upper}} \, c_p \, \max(T_{\text{upper}} - T_{\text{lower}}, \, 1)}
 $
 
-定常状態ではこの 2 つがバランスし、界面高さが安定する。
+アウフグース質量交換項: $\beta_{\text{aug}}$ [kg/s] の双方向混合では、
+上層空気が下層へ、下層空気が上層へ同時に移動する。
+密度差により等質量の体積が異なるため、正味の体積変化が生じる:
+
+$
+\dot{V}_{\text{mix}} = \beta_{\text{aug}} \left( \frac{1}{\rho_{\text{lower}}} - \frac{1}{\rho_{\text{upper}}} \right)
+$
+
+$\rho_{\text{upper}} < \rho_{\text{lower}}$（高温空気は低密度）のとき $\dot{V}_{\text{mix}} < 0$ となり、
+界面が下降する。これはタオルが高温空気を強制的に下方へ押す効果を表す。
+
+定常状態ではこれらがバランスし、界面高さが安定する。
 
 \paragraph{密度の温度依存性}
 
@@ -386,6 +416,7 @@ $
 \begin{itemize} \item Morton, Taylor \& Turner (1956), "Turbulent Gravitational Convection from Maintained and Instantaneous Sources", Proc. R. Soc. A 234:1-23 \end{itemize}
 \begin{itemize} \item Zukoski (1978), "Development of a Stratified Ceiling Layer in the Early Stages of a Closed-Room Fire", NBS-GCR-78-150 \end{itemize}
 \begin{itemize} \item Cooper (1982), "A Mathematical Model for Estimating Available Safe Egress Time in Fires", NBSIR 82-2612 \end{itemize}
+\begin{itemize} \item Heskestad (1984), "Engineering Relations for Fire Plumes", Fire Safety Journal 7(1):25-32 \end{itemize}
 
 \bigskip\hrule\bigskip
 
