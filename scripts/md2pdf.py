@@ -31,13 +31,16 @@ def md_to_latex(md_text: str) -> str:
     in_math_block = False
     skip_toc_section = False
     table_cols = 0
+    table_header_pending = True
 
     def _close_table() -> None:
-        nonlocal in_table
+        nonlocal in_table, table_header_pending
         if in_table:
-            latex_lines.append(r"\end{tabular}")
-            latex_lines.append(r"\end{table}")
+            latex_lines.append(r"\end{tabularx}")
+            latex_lines.append(r"}")  # close \small
+            latex_lines.append("")
             in_table = False
+            table_header_pending = True
 
     for line in lines:
         if line.strip().startswith("```"):
@@ -105,21 +108,35 @@ def md_to_latex(md_text: str) -> str:
             latex_lines.append(r"\bigskip\hrule\bigskip")
             continue
 
-        # Table rows
-        if "|" in line and not line.strip().startswith("```"):
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        # Table rows — only detect if line starts/ends with |
+        # (avoids false positive on inline math like $|x|$)
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|") and not stripped.startswith("```"):
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
             # Skip separator rows like |---|---|
             if all(re.match(r"^[-:]+$", c) for c in cells):
                 continue
             if not in_table:
                 table_cols = len(cells)
-                col_spec = "|".join(["l"] * table_cols)
-                latex_lines.append(r"\begin{table}[h]")
-                latex_lines.append(r"\centering")
-                latex_lines.append(r"\begin{tabular}{|" + col_spec + r"|}")
+                # Use tabularx: first column fixed-width, rest auto-wrap
+                if table_cols <= 3:
+                    col_spec = "|".join(["L"] * table_cols)
+                else:
+                    # First column narrow, rest flexible
+                    col_spec = "l|" + "|".join(["L"] * (table_cols - 1))
+                latex_lines.append(r"{\small")
+                latex_lines.append(r"\noindent")
+                latex_lines.append(
+                    r"\begin{tabularx}{\textwidth}{|" + col_spec + r"|}"
+                )
                 latex_lines.append(r"\hline")
                 in_table = True
+                table_header_pending = True
             escaped = [_escape_tex(_inline_math_preserve(c)) for c in cells]
+            # Bold the header row (first row of each table)
+            if table_header_pending:
+                escaped = [r"\textbf{" + e + "}" for e in escaped]
+                table_header_pending = False
             latex_lines.append(" & ".join(escaped) + r" \\")
             latex_lines.append(r"\hline")
             continue
@@ -227,14 +244,14 @@ def _escape_tex(text: str) -> str:
     # Convert markdown links [text](url) → text only
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
 
-    # Split on $ math delimiters and placeholders
-    parts = re.split(r"(\$[^$]+\$)", text)
+    # Split on $ math delimiters and \texttt{...} blocks — preserve both
+    parts = re.split(r"(\$[^$]+\$|\\texttt\{[^}]*\})", text)
     result = []
     for part in parts:
         if part.startswith("$") and part.endswith("$"):
-            result.append(part)  # math — keep as-is
+            result.append(part)
         elif part.startswith(r"\texttt{"):
-            result.append(part)  # already formatted
+            result.append(part)
         else:
             # Bold **text**
             part = re.sub(
@@ -287,8 +304,13 @@ def _wrap_document(body: str) -> str:
 \usepackage{fancyhdr}
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{array}
 
-\geometry{margin=2.5cm}
+% Column type L: auto-wrapping left-aligned column for tabularx
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+\geometry{margin=2.0cm}
 \setlength{\headheight}{14pt}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 

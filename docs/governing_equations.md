@@ -464,7 +464,7 @@ PIMPLE (PISO + SIMPLE の融合) アルゴリズム。
 |------|-----|
 | 解法 | 前進 Euler（擬似時間ステップ $\Delta t = 0.5$） |
 | 状態変数 | $T_{\text{upper}}$, $T_{\text{lower}}$, $z_{\text{int}}$ |
-| 収束判定 | $\max(|T_{\text{upper}}^{n+1} - T_{\text{upper}}^n|, \; 10 |z_{\text{int}}^{n+1} - z_{\text{int}}^n|) < 10^{-4}$ |
+| 収束判定 | $\max(\lvert T_{\text{upper}}^{n+1} - T_{\text{upper}}^n \rvert, \; 10 \lvert z_{\text{int}}^{n+1} - z_{\text{int}}^n \rvert) < 10^{-4}$ |
 | 最大反復数 | 10,000 |
 | 物理クリッピング | $T_{\text{upper}} \in [T_{\text{wall}},\; T_{\text{wall}}+200]$ K |
 | | $z_{\text{int}} \in [0.05H,\; 0.95H]$ |

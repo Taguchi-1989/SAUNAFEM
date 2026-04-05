@@ -16,8 +16,13 @@
 \usepackage{fancyhdr}
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{array}
 
-\geometry{margin=2.5cm}
+% Column type L: auto-wrapping left-aligned column for tabularx
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+\geometry{margin=2.0cm}
 \setlength{\headheight}{14pt}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
@@ -47,28 +52,31 @@
 
 \subsection{1. ソルバー概要}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|L|}
 \hline
-項目 & 正確版 (OpenFOAM) & 簡易版 (simple\_solver.py) \\
+\textbf{項目} & \textbf{正確版 (OpenFOAM)} & \textbf{簡易版 (simple\_solver.py)} \\
 \hline
-次元 & 3D & 1D (鉛直方向のみ) \\
+次元 & 3D & 0D (2ゾーン集中定数) \\
 \hline
-方程式 & N-S + エネルギー + 乱流 & エネルギーのみ (拡散+熱源-壁損失) \\
+方程式 & N-S + エネルギー + 乱流 & ゾーン質量保存 + エネルギー保存 + プルーム相関式 \\
 \hline
-乱流モデル & k-ε (標準) & なし (実効拡散係数で近似) \\
+乱流モデル & SST k-omega & なし (プルーム相関式に内包) \\
 \hline
-圧力-速度連成 & SIMPLE 法 & なし (速度場を解かない) \\
+圧力-速度連成 & PIMPLE 法 (非定常) & なし (速度場を解かない) \\
 \hline
-用途 & 本計算・検証 & 可視化プロトタイプ・UI 開発 \\
+時間積分 & backward (2次精度陰解法) & 前進 Euler (擬似時間進行) \\
 \hline
-\end{tabular}
-\end{table}
+用途 & 本計算・検証 & 可視化 UI・パラメータスタディ \\
+\hline
+\end{tabularx}
+}
+
 
 \bigskip\hrule\bigskip
 
-\subsection{2. 正確バージョン — OpenFOAM}
+\subsection{2. 正確バージョン — OpenFOAM (buoyantPimpleFoam)}
 
 \subsubsection{2.1 連続の式 (質量保存)}
 
@@ -78,33 +86,38 @@ $
 
 \begin{itemize} \item $\rho$: 密度 [kg/m³]（完全ガス状態方程式で計算） \end{itemize}
 \begin{itemize} \item $\mathbf{U}$: 速度ベクトル [m/s] \end{itemize}
-\begin{itemize} \item 定常計算 (steadyState) では $\partial/\partial t = 0$ \end{itemize}
+\begin{itemize} \item 非定常計算 (buoyantPimpleFoam) のため時間微分項を保持 \end{itemize}
 
 \subsubsection{2.2 運動量保存 (Navier-Stokes)}
 
 $
-\nabla \cdot (\rho \mathbf{U} \otimes \mathbf{U})
+\frac{\partial (\rho \mathbf{U})}{\partial t}
++ \nabla \cdot (\rho \mathbf{U} \otimes \mathbf{U})
 = -\nabla p_{rgh}
 + \nabla \cdot \left[ \mu_{\text{eff}} \left( \nabla \mathbf{U} + (\nabla \mathbf{U})^T - \frac{2}{3} (\nabla \cdot \mathbf{U}) \mathbf{I} \right) \right]
 + \rho \mathbf{g}
 $
 
 ここで:
+
 \begin{itemize} \item $p_{rgh} = p - \rho \mathbf{g} \cdot \mathbf{r}$: 静水圧を除いた修正圧力 [Pa] \end{itemize}
 \begin{itemize} \item $\mu_{\text{eff}} = \mu + \mu_t$: 実効粘性 [Pa·s] \end{itemize}
 \begin{itemize} \item $\mathbf{g} = (0, -9.81, 0)$ m/s²: 重力加速度 \end{itemize}
 \begin{itemize} \item \textbf{浮力駆動流}: 密度差 → 圧力勾配 → プルーム上昇 \end{itemize}
 
-OpenFOAM での離散化 (\texttt{fvSchemes}):
+離散化 (\texttt{fvSchemes}):
+
 \begin{verbatim}
 div(phi,U):  bounded Gauss linearUpwind grad(U)   ← 2次風上 (数値拡散低減)
 grad(U):     cellLimited Gauss linear 1            ← セル制限付き線形
+ddt:         backward                              ← 2次精度陰的時間積分
 \end{verbatim}
 
 \subsubsection{2.3 エネルギー保存}
 
 $
-\nabla \cdot (\rho \mathbf{U} h) = \nabla \cdot (\alpha_{\text{eff}} \nabla T) + q_{\text{source}}
+\frac{\partial (\rho h)}{\partial t}
++ \nabla \cdot (\rho \mathbf{U} h) = \nabla \cdot (\alpha_{\text{eff}} \nabla T) + q_{\text{source}}
 $
 
 \begin{itemize} \item $h = c_p T$: 比エンタルピー (sensibleEnthalpy) [J/kg] \end{itemize}
@@ -113,57 +126,76 @@ $
 \begin{itemize} \item $c_p = 1005$ J/(kg·K), $Pr = 0.7$ \end{itemize}
 
 離散化:
+
 \begin{verbatim}
 div(phi,T):  bounded Gauss linearUpwind default    ← 2次風上
 laplacian:   Gauss linear corrected                ← 2次中心差分 + 非直交補正
 \end{verbatim}
 
-\subsubsection{2.4 乱流モデル (標準 k-ε)}
+\subsubsection{2.4 乱流モデル (SST k-omega)}
+
+Menter の SST (Shear Stress Transport) k-omega モデルを採用。
+標準 k-epsilon に比べ、壁面近傍の低レイノルズ数領域と
+自然対流における熱伝達率の予測精度が優れる。
 
 \textbf{乱流運動エネルギー k:}
+
 $
-\nabla \cdot (\rho \mathbf{U} k)
-= \nabla \cdot \left( \frac{\mu_t}{\sigma_k} \nabla k \right)
-+ P_k - \rho \varepsilon
+\frac{\partial (\rho k)}{\partial t}
++ \nabla \cdot (\rho \mathbf{U} k)
+= \nabla \cdot \left[ (\mu + \sigma_k \mu_t) \nabla k \right]
++ P_k - \beta^* \rho k \omega
 $
 
-\textbf{乱流散逸率 ε:}
+\textbf{比散逸率 omega:}
+
 $
-\nabla \cdot (\rho \mathbf{U} \varepsilon)
-= \nabla \cdot \left( \frac{\mu_t}{\sigma_\varepsilon} \nabla \varepsilon \right)
-+ \frac{\varepsilon}{k} \left( C_{\varepsilon 1} P_k - C_{\varepsilon 2} \rho \varepsilon \right)
+\frac{\partial (\rho \omega)}{\partial t}
++ \nabla \cdot (\rho \mathbf{U} \omega)
+= \nabla \cdot \left[ (\mu + \sigma_\omega \mu_t) \nabla \omega \right]
++ \frac{\gamma}{\nu_t} P_k - \beta \rho \omega^2
++ 2(1 - F_1) \frac{\rho \sigma_{\omega 2}}{\omega} \nabla k \cdot \nabla \omega
 $
 
 \textbf{乱流粘性:}
+
 $
-\mu_t = \rho C_\mu \frac{k^2}{\varepsilon}
+\mu_t = \frac{\rho a_1 k}{\max(a_1 \omega, \; S F_2)}
 $
 
-\textbf{モデル定数:}
+ここで $F_1$, $F_2$ はブレンディング関数、$S$ はひずみ速度テンソルの大きさ。
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|}
+\textbf{SST k-omega の利点 (サウナ解析において):}
+
+\begin{itemize} \item 壁面近傍: k-omega モデルが自動的に適用され、壁面関数への依存が軽減 \end{itemize}
+\begin{itemize} \item 主流域: k-epsilon 相当の挙動にブレンドされ安定 \end{itemize}
+\begin{itemize} \item 自然対流の壁面熱伝達率を k-epsilon より正確に予測 \end{itemize}
+
+\textbf{壁面境界条件:}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|}
 \hline
-定数 & 値 \\
+\textbf{変数} & \textbf{壁面 BC} \\
 \hline
-$C_\mu$ & 0.09 \\
+k & kqRWallFunction \\
 \hline
-$C_{\varepsilon 1}$ & 1.44 \\
+omega & omegaWallFunction \\
 \hline
-$C_{\varepsilon 2}$ & 1.92 \\
+nut & nutkWallFunction \\
 \hline
-$\sigma_k$ & 1.0 \\
+alphat & compressible::alphatWallFunction (Prt = 0.85) \\
 \hline
-$\sigma_\varepsilon$ & 1.3 \\
-\hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
 
 離散化:
+
 \begin{verbatim}
-div(phi,k):       bounded Gauss upwind    ← 1次風上 (安定性重視)
-div(phi,epsilon):  bounded Gauss upwind    ← 1次風上
+div(phi,k):      bounded Gauss upwind    ← 1次風上 (安定性重視)
+div(phi,omega):  bounded Gauss upwind    ← 1次風上
 \end{verbatim}
 
 \subsubsection{2.5 状態方程式}
@@ -175,109 +207,171 @@ $
 \begin{itemize} \item $M_w = 28.96$ g/mol (空気の分子量) \end{itemize}
 \begin{itemize} \item $R = 8314$ J/(kmol·K) \end{itemize}
 \begin{itemize} \item 完全ガス (perfectGas) 仮定 \end{itemize}
+\begin{itemize} \item 熱物性モデル: \texttt{heRhoThermo} + \texttt{pureMixture} + \texttt{hConst} + \texttt{const} transport \end{itemize}
 
 \textbf{浮力の発生メカニズム:}
 ヒーター近傍で温度上昇 → 密度低下 → 浮力 → 上昇プルーム形成
 
-\bigskip\hrule\bigskip
+\subsubsection{2.6 時間平均場}
 
-\subsection{3. 簡易バージョン — 1D ゾーンモデル}
-
-\subsubsection{3.1 計算領域}
-
-サウナ室を鉛直方向に $N$ 個の水平層（デフォルト $N=50$）に分割する。
-各層は高さ $\Delta y = H/N$ の均一セル。
+非定常計算のため、統計量として時間平均場を出力する。
+\texttt{fieldAverage} 関数オブジェクトにより、指定開始時刻以降の
+$\bar{T}$, $\bar{U}$, $\overline{T'^2}$, $\overline{U'^2}$ を計算。
 
 \begin{verbatim}
- ┌────────────────────┐  ← ceiling (断熱)
- │  cell N-1 (top)     │
- │  cell N-2           │
- │  ...                │
- │  cell i_heater_top  │  ← ヒーター上端
- │  cell i_heater_btm  │  ← ヒーター下端
- │  ...                │
- │  cell 0 (bottom)    │
- └────────────────────┘  ← floor (T = T_wall)
+averaging_start: end_time * 0.5  (デフォルト: 後半50%を平均化)
 \end{verbatim}
 
-\subsubsection{3.2 支配方程式 (各セル i のエネルギー収支)}
+\bigskip\hrule\bigskip
+
+\subsection{3. 簡易バージョン — 2-Zone プルームモデル}
+
+\subsubsection{3.1 モデル概要}
+
+建築環境工学で標準的な \textbf{2層ゾーンモデル} を採用。
+Morton-Taylor-Turner (MTT) のエントレインメント理論と
+Zukoski のプルーム相関式に基づく。
+
+\begin{verbatim}
+ ┌─────────────────────────────────┐  ← ceiling
+ │                                 │
+ │   上層 (Upper hot layer)         │  温度: T_upper
+ │   密度: rho_upper = rho_0 * T_wall / T_upper
+ │                                 │
+ ├ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤  ← 界面高さ z_int
+ │                                 │
+ │   下層 (Lower cool layer)        │  温度: T_lower
+ │   密度: rho_lower = rho_0 * T_wall / T_lower
+ │          ┌───┐                  │
+ │          │ H │ ← ヒーター         │
+ │          │   │   (プルーム発生源)   │
+ └──────────┴───┴──────────────────┘  ← floor
+              ↑
+           プルーム上昇
+         (エントレインメント)
+\end{verbatim}
+
+\textbf{1D 拡散モデルとの根本的な違い:}
+
+\begin{itemize} \item 対流を「大きな熱拡散」で近似する代わりに、プルームの質量・エネルギー輸送を直接モデル化 \end{itemize}
+\begin{itemize} \item 質量保存則を遵守（プルーム上昇量 = 壁面沿い下降量） \end{itemize}
+\begin{itemize} \item 物理的根拠のある相関式（Zukoski のプルーム相関）を使用 \end{itemize}
+
+\subsubsection{3.2 プルームモデル (Zukoski 相関式)}
+
+ヒーター中心から高さ $z$ の位置におけるプルーム質量流量:
 
 $
-\rho c_p \frac{\partial T_i}{\partial t}
-= \underbrace{k_{\text{mix}} \frac{T_{i-1} - 2T_i + T_{i+1}}{\Delta y^2}}_{\text{鉛直拡散}}
-+ \underbrace{S_i}_{\text{プルーム熱源}}
-- \underbrace{\frac{h_{\text{wall}} \cdot P \cdot \Delta y \cdot (T_i - T_{\text{wall}})}{V_{\text{cell}}}}_{\text{壁面熱損失}}
+\dot{m}_p(z) = 0.071 \, Q_c^{1/3} \, z^{5/3} + 0.0018 \, Q_c
 $
 
 ここで:
-\begin{itemize} \item $\rho = 1.0$ kg/m³ \end{itemize}
-\begin{itemize} \item $c_p = 1005$ J/(kg·K) \end{itemize}
-\begin{itemize} \item $k_{\text{mix}} = 2.0$ W/(m·K): 実効鉛直混合熱伝導率（乱流対流を近似） \end{itemize}
-\begin{itemize} \item $S_i$: プルーム熱源分布 [W/m³] \end{itemize}
-\begin{itemize} \item $h_{\text{wall}} = 8.0$ W/(m²·K): 壁面自然対流熱伝達率 \end{itemize}
+
+\begin{itemize} \item $Q_c$: 対流熱出力 [kW] ($Q_c = f_{\text{conv}} \times Q_{\text{heater}}$, $f_{\text{conv}} = 0.7$) \end{itemize}
+\begin{itemize} \item $z$: ヒーター中心からの鉛直距離 [m] \end{itemize}
+\begin{itemize} \item $\dot{m}_p$: プルーム質量流量 [kg/s] \end{itemize}
+
+プルーム温度（エネルギー保存から）:
+
+$
+T_{\text{plume}} = T_{\text{lower}} + \frac{Q_c}{\dot{m}_p \, c_p}
+$
+
+\textbf{物理的意味:} プルームが上昇するにつれ周囲空気をエントレイン（巻き込み）し、
+質量流量は増加するが温度は低下する。これは MTT 理論の本質的な特徴。
+
+\subsubsection{3.3 支配方程式}
+
+\textbf{状態変数:} $T_{\text{upper}}$ (上層温度), $T_{\text{lower}}$ (下層温度), $z_{\text{int}}$ (界面高さ)
+
+\paragraph{上層エネルギー保存}
+
+$
+\rho_{\text{upper}} \, c_p \, V_{\text{upper}} \, \frac{dT_{\text{upper}}}{dt}
+= \underbrace{\dot{m}_p \, c_p \, (T_{\text{plume}} - T_{\text{upper}})}_{\text{プルームからの熱入力}}
+- \underbrace{h_{\text{wall}} \, A_{\text{wall,upper}} \, (T_{\text{upper}} - T_{\text{wall}})}_{\text{壁面熱損失}}
+$
+
+ここで:
+
+\begin{itemize} \item $V_{\text{upper}} = A_{\text{floor}} \times (H - z_{\text{int}})$: 上層体積 [m³] \end{itemize}
+\begin{itemize} \item $A_{\text{wall,upper}} = P \times (H - z_{\text{int}}) + A_{\text{floor}}$: 上層が接する壁面積 (側壁 + 天井) [m²] \end{itemize}
 \begin{itemize} \item $P = 2(W + D)$: 水平断面の周長 [m] \end{itemize}
-\begin{itemize} \item $V_{\text{cell}} = W \cdot D \cdot \Delta y$: セル体積 [m³] \end{itemize}
 
-\subsubsection{3.3 プルーム熱源分布 $S_i$}
-
-プルームによる熱の鉛直分配を以下のプロファイルで近似:
+\paragraph{下層エネルギー保存}
 
 $
-\hat{S}_i = \begin{cases}
-0.05 & (y_i < y_{\text{heater,bottom}}) \\
-2.0 & (y_{\text{heater,bottom}} \le y_i \le y_{\text{heater,top}}) \\
-1.0 + 2.0 \cdot \xi^{1.5} & (y_i > y_{\text{heater,top}})
-\end{cases}
+\rho_{\text{lower}} \, c_p \, V_{\text{lower}} \, \frac{dT_{\text{lower}}}{dt}
+= \underbrace{Q_{\text{rad}} \times 0.3}_{\text{輻射受熱}}
++ \underbrace{k_{\text{int}} \, A_{\text{floor}} \, \frac{T_{\text{upper}} - T_{\text{lower}}}{0.1 H}}_{\text{界面伝導}}
+- \underbrace{h_{\text{wall}} \, A_{\text{wall,lower}} \, (T_{\text{lower}} - T_{\text{wall}})}_{\text{壁面熱損失}}
 $
 
-ここで $\xi = (y_i - y_{\text{heater,top}}) / (H - y_{\text{heater,top}})$ は
-ヒーター上端からの無次元距離（天井効果を表現）。
+ここで:
 
-正規化:
+\begin{itemize} \item $Q_{\text{rad}} = (1 - f_{\text{conv}}) \times Q_{\text{heater}}$: ヒーターからの輻射熱 [W] \end{itemize}
+\begin{itemize} \item $k_{\text{int}} = 0.5$ W/(m·K): 界面の実効熱伝導率 \end{itemize}
+
+\paragraph{界面質量保存}
+
 $
-S_i = \hat{S}_i \cdot \frac{Q_{\text{heater}}}{\sum_j \hat{S}_j \cdot W \cdot D \cdot \Delta y}
+A_{\text{floor}} \, \frac{dz_{\text{int}}}{dt}
+= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}}
 $
 
-$Q_{\text{heater}}$: ヒーター出力 [W]。全セルの合計熱入力がヒーター出力と一致するように正規化。
+ここで:
 
-\subsubsection{3.4 境界条件}
+\begin{itemize} \item $\dot{m}_p / \rho_{\text{upper}}$: プルームが上層に供給する体積流量（界面を押し下げる） \end{itemize}
+\begin{itemize} \item $\dot{V}_{\text{return}}$: 壁面沿い下降流による体積流量（界面を押し上げる） \end{itemize}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|}
+$
+\dot{V}_{\text{return}} = \frac{h_{\text{wall}} \, A_{\text{wall,upper}} \, (T_{\text{upper}} - T_{\text{wall}})}{\rho_{\text{upper}} \, c_p \, \max(T_{\text{upper}} - T_{\text{lower}}, \, 1)}
+$
+
+定常状態ではこの 2 つがバランスし、界面高さが安定する。
+
+\paragraph{密度の温度依存性}
+
+$
+\rho = \rho_0 \frac{T_{\text{wall}}}{T}
+$
+
+\begin{itemize} \item $\rho_0 = 1.1$ kg/m³ (基準密度, \textasciitilde{}300K) \end{itemize}
+
+\subsubsection{3.4 温度プロファイルの構築}
+
+2-Zone の集中定数 ($T_{\text{upper}}$, $T_{\text{lower}}$) から
+鉛直方向の連続プロファイルをシグモイド関数で補間:
+
+$
+T(y) = T_{\text{lower}} + \frac{T_{\text{upper}} - T_{\text{lower}}}{1 + \exp\left(-3 \cdot \frac{y - z_{\text{int}}}{\delta / 2}\right)}
+$
+
+ここで $\delta = 0.15 H$ は遷移層の厚さ。
+
+\subsubsection{3.5 境界条件と制約}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|}
 \hline
-境界 & 条件 \\
+\textbf{境界/制約} & \textbf{条件} \\
 \hline
-床 (i=0 の下隣) & $T = T_{\text{wall}}$ (固定温度) \\
+界面高さ & $0.05 H \le z_{\text{int}} \le 0.95 H$ \\
 \hline
-天井 (i=N-1 の上隣) & $T_{N} = T_{N-1}$ (断熱: ゼロ勾配) \\
+上層温度 & $T_{\text{wall}} \le T_{\text{upper}} \le T_{\text{wall}} + 200$ K \\
 \hline
-側壁 & Newton 冷却: $q = h_{\text{wall}} (T_i - T_{\text{wall}})$ \\
+下層温度 & $T_{\text{wall}} - 1 \le T_{\text{lower}} \le T_{\text{upper}}$ \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
 
-\subsubsection{3.5 数値解法}
 
-\textbf{緩和付き反復法 (擬似時間進行):}
+\subsubsection{3.6 参考文献}
 
-\begin{verbatim}
-for iteration in range(max_iter):
-    for i in range(N):
-        rhs = (diffusion + source - wall_loss) / (rho * cp)
-        T[i] += alpha * rhs    # alpha = 0.5 (緩和係数)
-
-    residual = max|T_new - T_old|
-    if residual < tol:  break   # tol = 1e-6
-\end{verbatim}
-
-\begin{itemize} \item ガウス-ザイデル型の点緩和法（最新値を即座に使用） \end{itemize}
-\begin{itemize} \item 緩和係数 $\alpha = 0.5$ で安定性確保 \end{itemize}
-\begin{itemize} \item 物理的制約: $T_{\text{wall}} - 1 \le T_i \le T_{\text{wall}} + 200$ [K] \end{itemize}
-\begin{itemize} \item 最大反復数: 5000 \end{itemize}
-
-\textbf{注意:} これは厳密な時間積分ではなく、定常解への擬似的な時間進行。
-各反復で RHS を直接加算し、十分に小さい変化量で収束を判定する。
+\begin{itemize} \item Morton, Taylor \& Turner (1956), "Turbulent Gravitational Convection from Maintained and Instantaneous Sources", Proc. R. Soc. A 234:1-23 \end{itemize}
+\begin{itemize} \item Zukoski (1978), "Development of a Stratified Ceiling Layer in the Early Stages of a Closed-Room Fire", NBS-GCR-78-150 \end{itemize}
+\begin{itemize} \item Cooper (1982), "A Mathematical Model for Estimating Available Safe Egress Time in Fires", NBSIR 82-2612 \end{itemize}
 
 \bigskip\hrule\bigskip
 
@@ -292,11 +386,11 @@ for iteration in range(max_iter):
          │                          │
          │     ┌──────┐             │
   heater │     │ 内部 │             │ fixedValue
-  patch  │     │ 領域 │             │ T_wall
+  _wall  │     │ 領域 │             │ T_wall
  (熱流束)│     │      │             │ (opposite_wall)
          │     │      │             │
          │     └──────┘             │
-         │   heater_surround        │
+         │  heater_wall_surround    │
          │   (fixedValue T_wall)    │
          └──────────────────────────┘
                   floor
@@ -307,28 +401,30 @@ for iteration in range(max_iter):
 
 \textbf{各パッチの境界条件:}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-パッチ名 & 温度 BC & 速度 BC & 圧力 BC \\
+\textbf{パッチ名} & \textbf{温度 BC} & \textbf{速度 BC} & \textbf{圧力 BC} \\
 \hline
-heater\_wall & externalWallHeatFluxTemperature (flux モード) & fixedValue (0,0,0) & fixedFluxPressure \\
+heater\_wall & externalWallHeatFluxTemperature (flux) & noSlip & fixedFluxPressure \\
 \hline
-heater\_surround & fixedValue $T_{\text{wall}}$ & fixedValue (0,0,0) & fixedFluxPressure \\
+heater\_wall\_surround & fixedValue $T_{\text{wall}}$ & noSlip & fixedFluxPressure \\
 \hline
-floor & fixedValue $T_{\text{wall}}$ & fixedValue (0,0,0) & fixedFluxPressure \\
+floor & fixedValue $T_{\text{wall}}$ & noSlip & fixedFluxPressure \\
 \hline
-ceiling & fixedValue $T_{\text{wall}}$ & fixedValue (0,0,0) & fixedFluxPressure \\
+ceiling & fixedValue $T_{\text{wall}}$ & noSlip & fixedFluxPressure \\
 \hline
-opposite\_wall & fixedValue $T_{\text{wall}}$ & fixedValue (0,0,0) & fixedFluxPressure \\
+opposite\_wall & fixedValue $T_{\text{wall}}$ & noSlip & fixedFluxPressure \\
 \hline
-front, back & fixedValue $T_{\text{wall}}$ & fixedValue (0,0,0) & fixedFluxPressure \\
+front, back & fixedValue $T_{\text{wall}}$ & noSlip & fixedFluxPressure \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
 
 \textbf{ヒーター熱流束の計算:}
+
 $
 q_{\text{heater}} = \frac{Q_{\text{kW}} \times 1000}{W_{\text{heater}} \times H_{\text{heater}}} \quad [\text{W/m}^2]
 $
@@ -338,98 +434,114 @@ $
 OpenFOAM は有限体積法 (FVM) で各セルのエネルギー収支を解く:
 
 $
-\underbrace{\sum_f (\rho \mathbf{U} h)_f \cdot \mathbf{S}_f}_{\text{対流フラックス}}
+\underbrace{\frac{\partial}{\partial t} \int_{V_P} \rho h \, dV}_{\text{蓄熱}}
++ \underbrace{\sum_f (\rho \mathbf{U} h)_f \cdot \mathbf{S}_f}_{\text{対流フラックス}}
 = \underbrace{\sum_f (\alpha_{\text{eff}} \nabla T)_f \cdot \mathbf{S}_f}_{\text{拡散フラックス}}
 + \underbrace{q \cdot V_P}_{\text{体積熱源}}
 $
 
 \begin{itemize} \item $f$: セル面, $\mathbf{S}_f$: 面積ベクトル \end{itemize}
 \begin{itemize} \item $V_P$: セル体積 \end{itemize}
+\begin{itemize} \item \textbf{蓄熱}: 非定常項（backward スキームで 2 次精度離散化） \end{itemize}
 \begin{itemize} \item \textbf{対流フラックス}: 流れによる熱輸送（linearUpwind で離散化） \end{itemize}
 \begin{itemize} \item \textbf{拡散フラックス}: 伝導+乱流拡散（Gauss linear corrected で離散化） \end{itemize}
 
-\subsubsection{4.3 簡易版の各項の物理的意味}
+\subsubsection{4.3 簡易版の熱収支模式図}
 
 \begin{verbatim}
-         T_{i+1}
-           ↑ 拡散 (k_mix)
-    ┌──────┼──────┐
-    │      │      │
-    │   T_i       │← 壁面損失 h_wall*(T_i - T_wall)
-    │      │      │
-    │   + S_i     │← プルーム熱源
-    │      │      │
-    └──────┼──────┘
-           ↓ 拡散 (k_mix)
-         T_{i-1}
+     ┌─────────────────────────────────┐
+     │         上層 (T_upper)           │
+     │                                 │
+     │  入力: plume enthalpy           │
+     │  出力: 壁面損失 (天井 + 上部側壁) │
+     ├ ─ ─ ─ ─ ─ ─ z_int ─ ─ ─ ─ ─ ─ ┤  ← 界面 (質量保存で決定)
+     │         下層 (T_lower)           │
+     │                                 │
+     │  入力: 輻射 + 界面伝導           │
+     │  出力: 壁面損失 (床 + 下部側壁)   │
+     │  出力: プルームへの空気供給       │
+     │          ↑ プルーム              │
+     │         [H] ヒーター              │
+     └─────────────────────────────────┘
 \end{verbatim}
 
 \bigskip\hrule\bigskip
 
 \subsection{5. 離散化スキームの対応表}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-微分項 & 物理的意味 & OpenFOAM スキーム & 簡易版での扱い \\
+\textbf{微分項} & \textbf{物理的意味} & \textbf{OpenFOAM スキーム} & \textbf{簡易版での扱い} \\
 \hline
-$\partial/\partial t$ & 時間変化 & steadyState (Phase 1) & 擬似時間進行 (緩和反復) \\
+$\partial/\partial t$ & 時間変化 & backward (2次精度陰解法) & 前進 Euler ($\Delta t = 0.5$) \\
 \hline
-$\nabla \cdot (\rho \mathbf{U} \phi)$ & 対流 & linearUpwind (2次風上) & 解かない (速度場なし) \\
+$\nabla \cdot (\rho \mathbf{U} \phi)$ & 対流 & linearUpwind (2次風上) & プルーム相関式で代替 \\
 \hline
-$\nabla \cdot (k \nabla T)$ & 拡散 & Gauss linear corrected (2次中心) & 中心差分: $(T_{i-1} - 2T_i + T_{i+1})/\Delta y^2$ \\
+$\nabla \cdot (k \nabla T)$ & 拡散 & Gauss linear corrected & 界面伝導 ($k_{\text{int}}$) \\
 \hline
 $\nabla p$ & 圧力勾配 & Gauss linear & 解かない \\
 \hline
-$q_{\text{source}}$ & 熱源 & 境界条件 (面熱流束) & 体積熱源分布 $S_i$ \\
+$q_{\text{source}}$ & 熱源 & 境界条件 (面熱流束) & プルームエンタルピー \\
 \hline
-壁面熱伝達 & 壁損失 & 境界条件 (fixedValue) & Newton 冷却則 \\
+壁面熱伝達 & 壁損失 & 壁面関数 + fixedValue & Newton 冷却則 ($h_{\text{wall}}$) \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
 
 \bigskip\hrule\bigskip
 
 \subsection{6. 数値解法と収束制御}
 
-\subsubsection{6.1 正確版 — SIMPLE 法}
+\subsubsection{6.1 正確版 — PIMPLE 法}
 
-SIMPLE (Semi-Implicit Method for Pressure-Linked Equations) アルゴリズム:
+PIMPLE (PISO + SIMPLE の融合) アルゴリズム。
+密閉空間の強い自然対流は本質的に非定常であるため、
+定常ソルバー (SIMPLE) ではなく非定常ソルバーを採用し、
+時間平均で統計量を取得する。
 
 \begin{verbatim}
-反復ループ:
-  1. 運動量方程式を解く → U* (仮の速度場)
-  2. 圧力補正方程式を解く → p'
-  3. 速度を補正 → U = U* + U'
-  4. エネルギー方程式を解く → T
-  5. 乱流方程式を解く → k, ε
-  6. 密度を更新 → ρ = f(p, T)
-  7. 収束判定 (全残差 < 閾値?)
+各時間ステップ:
+  外側ループ (nOuterCorrectors = 2):
+    1. 運動量方程式を解く → U* (仮の速度場)
+    2. エネルギー方程式を解く → T
+    3. 乱流方程式を解く → k, omega
+    4. 密度を更新 → rho = f(p, T)
+    内側ループ (nCorrectors = 1):
+      5. 圧力補正方程式を解く → p'
+      6. 速度を補正 → U = U* + U'
+  時間ステップ調整 (maxCo = 0.5)
 \end{verbatim}
 
 \textbf{線形ソルバー:}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-変数 & ソルバー & スムーザー & 許容残差 \\
+\textbf{変数} & \textbf{ソルバー} & \textbf{前処理} & \textbf{許容残差} \\
 \hline
 $p_{rgh}$ & GAMG (代数マルチグリッド) & Gauss-Seidel & 1e-7 (rel 0.01) \\
 \hline
-$U, T, k, \varepsilon$ & smoothSolver & 対称 Gauss-Seidel & 1e-7 (rel 0.1) \\
+$p_{rgh}$ Final & GAMG & Gauss-Seidel & 1e-7 (rel 0) \\
 \hline
-\end{tabular}
-\end{table}
-
-\textbf{収束残差閾値:}
-
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|}
+$U, T, k, \omega$ & PBiCGStab & DILU & 1e-7 (rel 0.1) \\
 \hline
-変数 & 閾値 \\
+$U, T, k, \omega$ Final & PBiCGStab & DILU & 1e-7 (rel 0) \\
+\hline
+\end{tabularx}
+}
+
+
+\textbf{PIMPLE 残差制御:}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|}
+\hline
+\textbf{変数} & \textbf{閾値} \\
 \hline
 $p_{rgh}$ & 1e-4 \\
 \hline
@@ -437,18 +549,17 @@ $U$ & 1e-4 \\
 \hline
 $T$ & 1e-5 (より厳密) \\
 \hline
-$k, \varepsilon$ & 1e-4 \\
-\hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
 
 \textbf{緩和係数 (Under-relaxation):}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|L|}
 \hline
-変数 & 緩和係数 & 備考 \\
+\textbf{変数} & \textbf{緩和係数} & \textbf{備考} \\
 \hline
 $p_{rgh}$ & 0.3 & 保守的 (圧力は不安定になりやすい) \\
 \hline
@@ -456,31 +567,55 @@ $U$ & 0.7 & 中程度 \\
 \hline
 $T$ & 0.5 & やや保守的 (浮力との結合が強い) \\
 \hline
-$k, \varepsilon$ & 0.7 & 中程度 \\
+$k, \omega$ & 0.7 & 中程度 \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
 
-\subsubsection{6.2 簡易版 — 点緩和反復法}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|}
+\textbf{時間ステップ制御:}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|L|}
 \hline
-項目 & 値 \\
+\textbf{パラメータ} & \textbf{値} & \textbf{備考} \\
 \hline
-解法 & ガウス-ザイデル型点緩和 \\
+deltaT & 0.05 s & 初期時間ステップ \\
 \hline
-緩和係数 & 0.5 \\
+maxCo & 0.5 & Courant 数上限 \\
 \hline
-収束判定 & $\max \lvert T^{n+1} - T^n \rvert < 10^{-6}$ \\
+adjustTimeStep & yes & 適応的時間ステップ調整 \\
 \hline
-最大反復数 & 5000 \\
+endTime & 300 s & 計算終了時刻 \\
 \hline
-物理クリッピング & $T \in [T_{\text{wall}}-1,\; T_{\text{wall}}+200]$ K \\
+\end{tabularx}
+}
+
+
+\subsubsection{6.2 簡易版 — 擬似時間進行}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|}
 \hline
-\end{tabular}
-\end{table}
+\textbf{項目} & \textbf{値} \\
+\hline
+解法 & 前進 Euler（擬似時間ステップ $\Delta t = 0.5$） \\
+\hline
+状態変数 & $T_{\text{upper}}$, $T_{\text{lower}}$, $z_{\text{int}}$ \\
+\hline
+収束判定 & $\max(\lvert T_{\text{upper}}^{n+1} - T_{\text{upper}}^n \rvert, \; 10 \lvert z_{\text{int}}^{n+1} - z_{\text{int}}^n \rvert) < 10^{-4}$ \\
+\hline
+最大反復数 & 10,000 \\
+\hline
+物理クリッピング & $T_{\text{upper}} \in [T_{\text{wall}},\; T_{\text{wall}}+200]$ K \\
+\hline
+ & $z_{\text{int}} \in [0.05H,\; 0.95H]$ \\
+\hline
+\end{tabularx}
+}
+
 
 \bigskip\hrule\bigskip
 
@@ -488,11 +623,11 @@ $k, \varepsilon$ & 0.7 & 中程度 \\
 
 \subsubsection{空気 (全ソルバー共通)}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-物性 & 記号 & 値 & 単位 \\
+\textbf{物性} & \textbf{記号} & \textbf{値} & \textbf{単位} \\
 \hline
 分子量 & $M_w$ & 28.96 & g/mol \\
 \hline
@@ -504,88 +639,360 @@ $k, \varepsilon$ & 0.7 & 中程度 \\
 \hline
 熱伝導率 & $\lambda = \mu c_p / Pr$ & 0.0258 & W/(m·K) \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
 
 \subsubsection{簡易版追加パラメータ}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-パラメータ & 記号 & 値 & 備考 \\
+\textbf{パラメータ} & \textbf{記号} & \textbf{値} & \textbf{根拠} \\
 \hline
-密度 (固定) & $\rho$ & 1.0 kg/m³ & 正確版は完全ガスで変動 \\
+基準密度 & $\rho_0$ & 1.1 kg/m³ & \textasciitilde{}300K での空気密度 \\
 \hline
-壁面熱伝達率 & $h_{\text{wall}}$ & 8.0 W/(m²·K) & 自然対流の概算値 \\
+壁面熱伝達率 & $h_{\text{wall}}$ & 8.0 W/(m²·K) & 自然対流の標準値 \\
 \hline
-実効混合熱伝導率 & $k_{\text{mix}}$ & 2.0 W/(m·K) & 乱流対流を包含した経験値 \\
+対流熱割合 & $f_{\text{conv}}$ & 0.7 & ヒーター出力の70\%が対流 \\
 \hline
-\end{tabular}
-\end{table}
+界面伝導率 & $k_{\text{int}}$ & 0.5 W/(m·K) & 界面を介した弱い伝導 \\
+\hline
+\end{tabularx}
+}
+
 
 \bigskip\hrule\bigskip
 
 \subsection{8. 簡易版と正確版の対応関係}
 
-\subsubsection{簡易化のポイント}
+\subsubsection{物理モデルの対応}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-物理現象 & 正確版 (OpenFOAM) & 簡易版 (1D ゾーン) & 簡易化による影響 \\
+\textbf{物理現象} & \textbf{正確版 (OpenFOAM)} & \textbf{簡易版 (2-Zone)} & \textbf{簡易化による影響} \\
 \hline
-\textbf{対流} & N-S 方程式で速度場を解く & 解かない。プルーム分布 $S_i$ で近似 & 速度分布・循環流を再現不可 \\
+\textbf{対流} & N-S 方程式で速度場を解く & MTT プルーム相関式で質量流量を算出 & 詳細な速度場は不明だが、プルームの総輸送量は再現 \\
 \hline
-\textbf{乱流} & k-ε モデルで乱流粘性を計算 & $k_{\text{mix}}$ (固定値) で近似 & 局所的な乱流強度の変化を再現不可 \\
+\textbf{乱流} & SST k-omega で乱流粘性を計算 & プルーム相関式に乱流効果が内包 & 局所的な乱流強度の変化を再現不可 \\
 \hline
-\textbf{浮力} & 密度差 → 圧力勾配 → 速度場 & プルーム経験式で直接熱分配 & 浮力-運動量の相互作用を無視 \\
+\textbf{浮力} & 密度差 → 圧力勾配 → 速度場 & 密度の温度依存 + プルーム浮力相関 & 浮力-運動量の直接結合はないが、エネルギー輸送は再現 \\
 \hline
-\textbf{壁面境界層} & 壁面関数 + メッシュ解像 & Newton 冷却 ($h_{\text{wall}}$ 固定) & 壁面近傍の詳細を無視 \\
+\textbf{質量保存} & 連続の式で厳密に保存 & プルーム上昇 = 壁面沿い下降で保存 & ゾーン間の質量収支は保存される \\
+\hline
+\textbf{壁面境界層} & omegaWallFunction + メッシュ解像 & Newton 冷却 ($h_{\text{wall}}$ 固定) & 壁面近傍の詳細を無視 \\
 \hline
 \textbf{水平方向分布} & 3D で空間分解 & 各層内で均一を仮定 & 水平方向の温度むらを再現不可 \\
 \hline
-\textbf{密度変化} & 完全ガス $\rho = pM/RT$ & $\rho = 1.0$ 固定 & 温度による密度変化を無視 \\
+\textbf{密度変化} & 完全ガス $\rho = pM/RT$ & $\rho = \rho_0 T_{\text{wall}} / T$ & 簡易的だが温度依存あり \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
 
-\subsubsection{正確に表現できていない部分}
 
-\begin{enumerate} \item \textbf{プルーム形状}: 簡易版では高さ方向の経験的分布で近似しており、 \end{enumerate}
-   プルームの水平方向の広がり・エントレインメントは再現していない
-\begin{enumerate} \item \textbf{循環流}: 正確版ではプルーム上昇 → 天井沿い拡散 → 壁沿い下降の \end{enumerate}
-   自然対流循環が形成されるが、簡易版では拡散のみで近似
-\begin{enumerate} \item \textbf{温度-密度結合}: 正確版では温度変化が密度変化を駆動し浮力を生むが、 \end{enumerate}
-   簡易版では密度一定のため、この非線形フィードバックがない
+\subsubsection{簡易版の限界}
 
-\subsubsection{簡易版でも正しく再現できること}
+\begin{enumerate} \item \textbf{速度場の不在}: プルーム相関式は総質量流量を与えるが、空間的な速度分布は得られない。 \end{enumerate}
+   アウフグース（Phase 3）のジェット流れは原理的にモデル化不可能。
+\begin{enumerate} \item \textbf{水平方向の均一仮定}: 各層内の水平温度分布が均一のため、 \end{enumerate}
+   ヒーター直上と壁面近傍の温度差は再現できない。
+\begin{enumerate} \item \textbf{蒸気輸送の困難}: ロウリュ（Phase 2）の蒸気は対流に乗って輸送されるが、 \end{enumerate}
+   速度場がないため拡散モデルでの近似が必要になり精度に限界がある。
 
-\begin{itemize} \item \textbf{温度成層の定性的傾向}: 上部高温・下部低温の基本パターン \end{itemize}
-\begin{itemize} \item \textbf{KPI の傾向}: K-01 (上下温度差) > 0 の判定は可能 \end{itemize}
-\begin{itemize} \item \textbf{パラメータ感度}: ヒーター出力や壁温を変えたときの応答傾向 \end{itemize}
+\subsubsection{簡易版で正しく再現できること}
+
+\begin{itemize} \item \textbf{温度成層}: 上層高温・下層低温の 2 層構造（物理的に正しいメカニズムで再現） \end{itemize}
+\begin{itemize} \item \textbf{界面高さ}: プルームの強さと壁面損失のバランスで決定される界面高さ \end{itemize}
+\begin{itemize} \item \textbf{KPI の傾向}: K-01 (上下温度差) > 0 の判定は信頼できる \end{itemize}
+\begin{itemize} \item \textbf{パラメータ感度}: ヒーター出力・壁温・部屋サイズを変えたときの応答傾向 \end{itemize}
+\begin{itemize} \item \textbf{エントレインメント効果}: プルーム高さが大きいほど巻き込みが増え温度が低下する現象 \end{itemize}
 
 \bigskip\hrule\bigskip
 
-\subsection{付録: フェーズ別の方程式拡張予定}
+\subsection{9. 既知の物理的制約とフェーズ拡張計画}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|}
+本節では、Phase 1 の方程式系に内在する物理的制約を明示し、
+Phase 2–3 で必要となる方程式拡張の具体的方針を示す。
+
+\subsubsection{9.1 蒸気化による体積膨張の無視 (Phase 2 で致命的)}
+
+\textbf{問題:} 現在の界面質量保存式は、乾燥空��のプルームのみを扱う。
+ロウリュ時に水 100 mL が気化すると、理想気体近似で約 170 L の蒸気が瞬時に生成される。
+一般的なサウナ室（体積 $V \sim 20$ m³）においてこの体積は無視できず、
+界面高さ $z_{\text{int}}$ を急激に押し下げる「ピストン効果」が生じる。
+現在の方程式にはこのソース項が存在しない。
+
+\textbf{拡張方針:} 界面質量保存式に気化体積生成速度を追加する:
+
+$
+A_{\text{floor}} \, \frac{dz_{\text{int}}}{dt}
+= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}}
+$
+
+ここで:
+
+$
+\dot{V}_{\text{steam}} = \frac{\dot{m}_{\text{water}} \, R \, T_{\text{upper}}}{p \, M_{w,\text{H}_2\text{O}}}
+$
+
+\begin{itemize} \item $\dot{m}_{\text{water}}$: 水の蒸発速度 [kg/s]（ロウリュ投入量と蒸発モデルから決定） \end{itemize}
+\begin{itemize} \item $M_{w,\text{H}_2\text{O}} = 18.015$ g/mol \end{itemize}
+\begin{itemize} \item 蒸発速度のモデルは Spalding の質量移動理論を使用予定 \end{itemize}
+
+上層エネルギー保存式にも蒸発潜熱の寄与を追加する:
+
+$
+Q_{\text{steam}} = \dot{m}_{\text{water}} \, L_v
+$
+
+ここで $L_v = 2.26 \times 10^6$ J/kg（水の蒸発潜熱, 100°C）。
+この項は上層の温度を一時的に上昇させつつ、界面を押し下げ、
+湿度ピーク（K-03）と到達時間（K-04）の両方に影響する。
+
+\subsubsection{9.2 アウフグース: ROM (低次元化モデル) によるハイブリッド・アプローチ (Phase 3)}
+
+\textbf{問題:} 「簡易版では対応不可」では、シミュレータ���としての価値が不十分。
+0D モデルで速度場（タオルによるジェット流れ）を解くことは不可能だが、
+「上層の熱を強制的に下層へ引きずり下ろす」効果をパラメータ化することは可能。
+
+\paragraph{拡張方針: ハイブリッド ROM (Reduced Order Model)}
+
+\begin{enumerate} \item \textbf{事前計算:} OpenFOAM で複数パターンのアウフグース（タオル振り周波数、振幅）を計算 \end{enumerate}
+\begin{enumerate} \item \textbf{パラメータ抽出:} 各条件における **層間強制混合係数 $\beta_{\text{aug}}$** [kg/s] を抽出。 \end{enumerate}
+   $\beta_{\text{aug}}$ はタオルが生成する強制循環による層間質量交換率を表す
+\begin{enumerate} \item \textbf{簡易版への統合:} アウフグース実行時のみ有効な強制混合項を追加: \end{enumerate}
+
+上層エネルギー保存:
+
+$
+\rho_{\text{upper}} c_p V_{\text{upper}} \frac{dT_{\text{upper}}}{dt}
+= \cdots - \beta_{\text{aug}} \, c_p \, (T_{\text{upper}} - T_{\text{lower}})
+$
+
+下層エネルギー保存:
+
+$
+\rho_{\text{lower}} c_p V_{\text{lower}} \frac{dT_{\text{lower}}}{dt}
+= \cdots + \beta_{\text{aug}} \, c_p \, (T_{\text{upper}} - T_{\text{lower}})
+$
+
+$\beta_{\text{aug}}$ は OpenFOAM の結果から次のように抽出:
+
+$
+\beta_{\text{aug}} = \frac{\dot{Q}_{\text{forced}}}{ c_p (T_{\text{upper}} - T_{\text{lower}})}
+$
+
+ここで $\dot{Q}_{\text{forced}}$ はアウフグースにより追加的に輸送された熱量（CFD 結果から計測）。
+これにより、計算負荷を上げずに「熱波が来る」現象を K-05（顔面風速ピーク）と
+K-06（簡易熱ストレス指標）に反映できる。
+
+\subsubsection{9.3 正確版の多成分化: 組成浮力の導入 (Phase 2 で必須)}
+
+\textbf{問題:} 現在の \texttt{pureMixture} + \texttt{perfectGas}（$M_w = 28.96$ 固定）は、
+水蒸気（$M_w = 18.015$）と乾燥空気の混合による密度変化を表現できない。
+ロウリュ時のプルーム急上昇は、温度差による \textbf{熱的浮力} に加え、
+蒸気濃度差による \textbf{組成浮力（solutal buoyancy）} の寄与が大きい。
+水蒸気は空気より軽い（$18/29 \approx 0.62$）ため、蒸気リッチなプルームは
+温度差だけで予測されるより速く上昇する。
+
+\textbf{拡張方針:} Phase 2 で熱物理モデルを変更:
+
+\begin{verbatim}
+thermoType
+{
+    type            heRhoThermo;
+    mixture         multiComponentMixture;   // ← pureMixture から変更
+    transport       sutherland;              // ← 温度依存粘性
+    thermo          janaf;                   // ← 温度依存 Cp
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+\end{verbatim}
+
+蒸気質量分率 $Y$ の輸送方程式を追加:
+
+$
+\frac{\partial (\rho Y)}{\partial t} + \nabla \cdot (\rho \mathbf{U} Y)
+= \nabla \cdot (D_{\text{eff}} \nabla Y) + S_Y
+$
+
+混合密度:
+
+$
+\rho = \frac{p}{R T} \left( \frac{Y}{M_{w,\text{H}_2\text{O}}} + \frac{1-Y}{M_{w,\text{air}}} \right)^{-1}
+$
+
+ここで $D_{\text{eff}} = D_{\text{mol}} + D_t$（分子拡散 + 乱流拡散）。
+$D_{\text{mol}} \approx 2.5 \times 10^{-5}$ m²/s（空気中の水蒸気拡散係数, 373K）。
+
+これにより密度が温度 $T$ と蒸気質量分率 $Y$ の両方に依存し、
+組成浮力が自動的に運動量方程式に反映される。
+
+\subsubsection{9.4 輻射モデルの改善}
+
+\textbf{問題:} 簡易版の下層エネルギー保存における $Q_{\text{rad}} \times 0.3$（固定係数）は
+以下の感度を失っている:
+
+\begin{itemize} \item ストーブの配置（部屋の中央 vs 隅） \end{itemize}
+\begin{itemize} \item 部屋の形状・アスペクト比 \end{itemize}
+\begin{itemize} \item ベンチや障害物による遮蔽 \end{itemize}
+
+サウナにおける人体の受熱量の半分以上は輻射によるものであり（特に高温域）、
+固定係数では熱ストレス指標（K-06）の空間的分布を正しく予測できない。
+
+\textbf{拡張方針 (簡易版):}
+
+ヒーター面を放射源、各受熱面（上部壁、下部壁、床、ベンチ）を受熱体とした
+\textbf{形態係数（View Factor）} を幾何学的に概算する:
+
+$
+F_{ij} = \frac{1}{A_i} \int_{A_i} \int_{A_j} \frac{\cos\theta_i \cos\theta_j}{\pi r^2} dA_j dA_i
+$
+
+簡易な直方体近似では、対向する平行平板の形態係数の解析解を利用できる
+（Hottel \& Sarofim, 1967; Howell et al., "Thermal Radiation Heat Transfer", 6th ed.）。
+
+下層の輻射受熱を形態係数で置き換える:
+
+$
+Q_{\text{rad,lower}} = Q_{\text{rad}} \times (F_{\text{heater} \to \text{floor}} + F_{\text{heater} \to \text{lower walls}})
+$
+
+$Q_{\text{rad}} \times 0.3$ の代わりにこれを使用すれば、部屋の形状やヒーター配置の変更に対して
+自動的に輻射配分が変化する。
+
+\textbf{拡張方針 (OpenFOAM):}
+
+Phase 2 以降で輻射モデルを導入する:
+
+\begin{verbatim}
+radiationModel  fvDOM;    // Finite Volume Discrete Ordinates Method
+// または
+radiationModel  viewFactor;  // 壁面間のみの輻射交換（計算コスト低）
+
+absorptionEmissionModel  greyMeanAbsorptionEmission;
+scatterModel    none;
+\end{verbatim}
+
+特に高温域（$T > 100$ °C）では壁面輻射による二次加熱（ストーブ → 壁 → 空気層 → 反対側の壁）
+が自然対流の境界層形成に影響するため、Phase 2 では必須。
+\texttt{viewFactor} モデルは壁面間のみの輻射交換を計算するため、計算コストが低く
+PoC フェーズに適している。
+
+\bigskip\hrule\bigskip
+
+\subsection{付録 A: フェーズ別の実装状況}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
 \hline
-フェーズ & 追加方程式 & 備考 \\
+\textbf{フェーズ} & \textbf{OpenFOAM} & \textbf{簡易版} & \textbf{状態} \\
 \hline
-Phase 1 (現在) & 上記の定常方程式 & buoyantSimpleFoam \\
+Phase 1 & buoyantPimpleFoam + SST k-omega, pureMixture & 2-Zone プルームモデル (定常) & \textbf{実装済} \\
 \hline
-Phase 2 (löyly) & 蒸気輸送方程式 $\nabla \cdot (\rho \mathbf{U} Y) = \nabla \cdot (D_{\text{eff}} \nabla Y)$ & 非定常 buoyantPimpleFoam に切替 \\
+Phase 2 & multiComponentMixture + 蒸気輸送 ($Y$) + H2O テンプレート & 蒸気体積膨張 $\dot{V}_{\text{steam}}$ + 蒸発潜熱 $Q_{\text{steam}}$ + 形態係数輻射 + 壁面昇温モデル + 湿度連成物性 + 非定常ソルバー (\texttt{solve\_transient}) & \textbf{実装済} \\
 \hline
-Phase 3 (Aufguss) & 運動量ソース項 (ジェット) & 扇風動作のモデル化 \\
+Phase 3 & 運動量ソース項 (ジェット) — 未実装 & ROM: 強制混合係数 $\beta_{\text{aug}}$ + 抽出スクリプト (\texttt{extract\_beta\_aug.py}) & \textbf{枠組み実装済} \\
 \hline
-Phase 4-5 & 方程式追加なし & 実験データとの比較・自動化 \\
+Phase 4-5 & — & CSV 取込 (\texttt{validation.py}) + プローブ比較 (\texttt{compare\_probes}) + レポート生成 (\texttt{reporting.py}) & \textbf{枠組み実装済} \\
 \hline
-\end{tabular}
-\end{table}
+\end{tabularx}
+}
+
+
+\subsection{付録 B: KPI 一覧と実装状況}
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|l|L|L|L|}
+\hline
+\textbf{KPI ID} & \textbf{名称} & \textbf{入力} & \textbf{実装} \\
+\hline
+K-01 & 定常温度差 (上段-下段) & プローブ定常値 & \textbf{済} (\texttt{kpi.py}) \\
+\hline
+K-02 & Löyly 後ピーク温度上昇 & 時系列 $T_{\text{upper}}(t)$ & \textbf{済} \\
+\hline
+K-03 & Löyly 後ピーク絶対湿度 & 時系列 $w(t)$ & \textbf{済} \\
+\hline
+K-04 & ピーク到達時間 & 時系列 $T_{\text{upper}}(t)$ + イベント時刻 & \textbf{済} \\
+\hline
+K-05 & 顔面風速ピーク (proxy) & $\beta_{\text{aug}}$ から推定 & \textbf{済} (ROM proxy) \\
+\hline
+K-06 & 簡易熱ストレス指標 & 体感温度 (乾球+湿度補正) & \textbf{済} \\
+\hline
+K-07 & 上下相対温度差 & プローブ定常値 & \textbf{済} (\texttt{kpi.py}) \\
+\hline
+\end{tabularx}
+}
+
+
+\subsection{付録 C: 簡易版の追加モデル (Phase 2 実装分)}
+
+\subsubsection{壁面集中定数モデル (lumped wall)}
+
+壁面内面温度 $T_{\text{wall,inner}}$ を状態変数として追加:
+
+$
+(\rho c_p)_w \, \delta_w \, A_{\text{wall}} \, \frac{dT_{\text{wall,inner}}}{dt}
+= \underbrace{Q_{\text{conv→wall}}}_{\text{空気→壁面対流}}
++ \underbrace{Q_{\text{rad→wall}}}_{\text{ヒーター輻射}}
+- \underbrace{\frac{\lambda_w}{\delta_w} A_{\text{wall}} (T_{\text{wall,inner}} - T_{\text{wall,outer}})}_{\text{壁面→外部熱伝導}}
+$
+
+パラメータ:
+
+\begin{itemize} \item $\delta_w = 0.015$ m (木製パネル厚さ) \end{itemize}
+\begin{itemize} \item $\lambda_w = 0.12$ W/(m·K) (木の熱伝導率) \end{itemize}
+\begin{itemize} \item $(\rho c_p)_w = 5 \times 10^5$ J/(m³·K) (木の体積熱容量) \end{itemize}
+
+\texttt{model: fixed} で従来の固定壁温、\texttt{model: lumped} で昇温モデルを選択。
+
+\subsubsection{湿度連成物性モデル}
+
+混合気体の物性を湿度比 $w$ [kg/kg] に応じて補正:
+
+$
+c_{p,\text{mix}} = (1 - y_v) \, c_{p,\text{air}} + y_v \, c_{p,\text{vapor}}
+$
+
+$
+h_{\text{wall,eff}} = h_{\text{wall,base}} \left(\frac{c_{p,\text{mix}}}{c_{p,\text{air}}}\right)^{0.25} \left(\frac{\lambda_{\text{mix}}}{\lambda_{\text{air}}}\right)^{0.75}
+$
+
+ここで $y_v = w / (1+w)$ は蒸気質量分率。
+
+\subsubsection{体感温度 (Steadman 近似)}
+
+$
+T_{\text{perceived}} \approx T_{\text{dry}} + 0.33 \left(\frac{RH \cdot p_{\text{sat}}}{1000}\right) - 4.0 \quad (T > 27°\text{C}, \; RH > 5\%)
+$
+
+$p_{\text{sat}}$ は Antoine 式から算出。湿度が高いほど蒸発冷却が阻害され、体感温度が上昇する。
+
+\subsubsection{ヒーター容量の目安}
+
+業界標準 (Harvia, HELO): 約 \textbf{1 kW / m³} のサウナ室体積。
+
+{\small
+\noindent
+\begin{tabularx}{\textwidth}{|L|L|L|}
+\hline
+\textbf{部屋サイズ} & \textbf{体積} & \textbf{推奨ヒーター} \\
+\hline
+2.0×1.5×2.2 m (1-2人) & 6.6 m³ & 6-8 kW \\
+\hline
+3.0×2.5×2.5 m (4-6人) & 18.8 m³ & 18-20 kW \\
+\hline
+4.0×3.0×2.5 m (商業用) & 30 m³ & 30 kW \\
+\hline
+\end{tabularx}
+}
+
 
 
 \end{document}
