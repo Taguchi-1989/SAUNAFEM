@@ -108,10 +108,16 @@ def main():
     case_dir = Path("results/openfoam_dry")
 
     # Find latest time directory
-    time_dirs = sorted(
-        [d.name for d in case_dir.iterdir() if d.is_dir() and d.name not in ("0", "constant", "system", "postProcessing")],
-        key=lambda x: float(x)
-    )
+    time_dirs = []
+    for d in case_dir.iterdir():
+        if d.is_dir():
+            try:
+                float(d.name)
+                if d.name != "0":
+                    time_dirs.append(d.name)
+            except ValueError:
+                pass
+    time_dirs.sort(key=float)
 
     if not time_dirs:
         print("No result time directories found!")
