@@ -6,6 +6,65 @@ FoamFile
     object      fvOptions;
 }
 
+{% if buoyancy_production | default(true) %}
+buoyancyProduction
+{
+    type            scalarCodedSource;
+    active          true;
+    selectionMode   all;
+
+    scalarCodedSourceCoeffs
+    {
+        selectionMode   all;
+        fields          (k);
+        name            buoyancyProductionK;
+
+        codeInclude
+        #{
+            #include "fvCFD.H"
+        #};
+
+        codeCorrect
+        #{
+        #};
+
+        codeAddSup
+        #{
+            // Buoyancy production/destruction term G_b for k-equation
+            // G_b = -(mu_t / (rho * Pr_t)) * (g & grad(rho))
+            // Stable stratification (hot above cold) -> suppresses turbulence
+            // Unstable stratification (cold above hot) -> enhances turbulence
+            const volScalarField& rho =
+                mesh_.lookupObject<volScalarField>("rho");
+            const volScalarField& mut =
+                mesh_.lookupObject<volScalarField>("mut");
+            const volScalarField& k =
+                mesh_.lookupObject<volScalarField>("k");
+
+            const dimensionedVector g("g", dimAcceleration, vector(0, -9.81, 0));
+            const scalar Prt = 0.85;
+
+            volScalarField Gb
+            (
+                "Gb",
+                -(mut / (rho * Prt)) * (g & fvc::grad(rho))
+            );
+
+            // Add as implicit source for numerical stability
+            eqn += fvm::Su
+            (
+                Gb / (k + dimensionedScalar("kSmall", k.dimensions(), 1e-15)),
+                k
+            );
+        #};
+
+        codeConstrain
+        #{
+        #};
+    }
+}
+{% endif %}
+
 {% if aufguss_enabled %}
 aufgussJet
 {
@@ -53,6 +112,8 @@ aufgussJet
         #};
     }
 }
-{% else %}
-// No fvOptions active (dry sauna or loyly only)
+{% endif %}
+
+{% if not (buoyancy_production | default(true)) and not aufguss_enabled %}
+// No fvOptions active
 {% endif %}

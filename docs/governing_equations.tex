@@ -144,8 +144,22 @@ $
 \frac{\partial (\rho k)}{\partial t}
 + \nabla \cdot (\rho \mathbf{U} k)
 = \nabla \cdot \left[ (\mu + \sigma_k \mu_t) \nabla k \right]
-+ P_k - \beta^* \rho k \omega
++ P_k + G_b - \beta^* \rho k \omega
 $
+
+ここで $G_b$ は浮力生成項:
+
+$
+G_b = -\frac{\mu_t}{\rho \, Pr_t} \left( \mathbf{g} \cdot \nabla \rho \right)
+$
+
+\begin{itemize}
+\item $Pr_t = 0.85$ (乱流プラントル数)
+\item $\mathbf{g} = (0, -9.81, 0)$ m/s$^2$ (重力加速度ベクトル)
+\item 安定成層 (上部高温・下部低温): $G_b < 0$ → 乱流を抑制し、温度層の鮮明化に寄与
+\item 不安定成層 (ヒーター近傍): $G_b > 0$ → 乱流を促進し、対流混合を強化
+\item 実装: 修正乱流モデルではなく fvOptions の codedSource により k 方程式に注入
+\end{itemize}
 
 \textbf{比散逸率 omega:}
 

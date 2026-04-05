@@ -209,6 +209,7 @@ class TestMultiComponentMixture:
             "aufguss_enabled": False,
             "aufguss_jet_velocity": 0.0,
             "aufguss_duration": 1.0,
+            "buoyancy_production": True,
         }
 
     def test_pure_mixture_default(self, tmp_path: Path) -> None:
@@ -253,6 +254,80 @@ class TestMultiComponentMixture:
         thermo = (out / "constant" / "thermophysicalProperties").read_text(encoding="utf-8")
         assert "pureMixture" in thermo
         assert not (out / "0" / "H2O").exists()
+
+
+class TestBuoyancyProduction:
+    """Tests for buoyancy production source term in fvOptions."""
+
+    _TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "foam_templates" / "base_case"
+
+    def _minimal_context(self, buoyancy: bool = True) -> dict:
+        """Build a minimal context dict for template rendering."""
+        return {
+            "dim_x": 3.0,
+            "dim_y": 2.5,
+            "dim_z": 2.5,
+            "nx": 24,
+            "ny": 20,
+            "nz": 20,
+            "heater_area": 0.3,
+            "heater_y0": 0.1,
+            "heater_y1": 0.6,
+            "heater_z0": 0.95,
+            "heater_z1": 1.55,
+            "vertices": [(0, 0, 0), (3, 0, 0), (3, 2.5, 0), (0, 2.5, 0),
+                         (0, 0, 2.5), (3, 0, 2.5), (3, 2.5, 2.5), (0, 2.5, 2.5)],
+            "blocks": [{"vertices": (0, 1, 2, 3, 4, 5, 6, 7), "cells": (24, 20, 20)}],
+            "floor_faces": [(0, 1, 5, 4)],
+            "ceiling_faces": [(3, 7, 6, 2)],
+            "heater_faces": [(0, 4, 7, 3)],
+            "heater_surround_faces": [],
+            "opposite_faces": [(1, 2, 6, 5)],
+            "front_faces": [(0, 3, 2, 1)],
+            "back_faces": [(4, 5, 6, 7)],
+            "heat_flux": 30000.0,
+            "heater_width": 0.6,
+            "heater_height": 0.5,
+            "T_walls": 293.15,
+            "T_initial": 293.15,
+            "solver_name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+            "probes": [],
+            "mixture_type": "pure",
+            "Y_H2O_initial": 0.01,
+            "Y_H2O_heater": 0.01,
+            "aufguss_enabled": False,
+            "aufguss_jet_velocity": 0.0,
+            "aufguss_duration": 1.0,
+            "buoyancy_production": buoyancy,
+        }
+
+    def test_buoyancy_source_enabled_by_default(self, tmp_path: Path) -> None:
+        """Buoyancy production source should appear in fvOptions by default."""
+        ctx = self._minimal_context(buoyancy=True)
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        fvoptions = (tmp_path / "constant" / "fvOptions").read_text(encoding="utf-8")
+        assert "buoyancyProduction" in fvoptions
+        assert "scalarCodedSource" in fvoptions
+        assert "buoyancyProductionK" in fvoptions
+        assert "fvc::grad(rho)" in fvoptions
+
+    def test_buoyancy_source_disabled(self, tmp_path: Path) -> None:
+        """When buoyancy_production is False, source should not appear."""
+        ctx = self._minimal_context(buoyancy=False)
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        fvoptions = (tmp_path / "constant" / "fvOptions").read_text(encoding="utf-8")
+        assert "buoyancyProduction" not in fvoptions
+
+    def test_build_case_includes_buoyancy(self, sample_case_path: Path, tmp_path: Path) -> None:
+        """Full build_case produces fvOptions with buoyancy production."""
+        out = tmp_path / "test_case"
+        build_case(sample_case_path, output_dir=out)
+        fvoptions = (out / "constant" / "fvOptions").read_text(encoding="utf-8")
+        assert "buoyancyProduction" in fvoptions
 
 
 class TestAufgussTemplate:

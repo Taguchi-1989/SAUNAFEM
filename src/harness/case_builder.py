@@ -354,6 +354,10 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     aufguss = data.get("aufguss")
     aufguss_enabled = aufguss is not None
 
+    # Buoyancy production term for k-equation (enabled by default)
+    turbulence = data.get("turbulence", {})
+    buoyancy_production = turbulence.get("buoyancy_production", True)
+
     context = {
         **mesh,
         **heater,
@@ -369,6 +373,7 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "aufguss_enabled": aufguss_enabled,
         "aufguss_jet_velocity": aufguss.get("jet_velocity", 2.0) if aufguss_enabled else 0.0,
         "aufguss_duration": aufguss.get("duration", 1.0) if aufguss_enabled else 1.0,
+        "buoyancy_production": buoyancy_production,
     }
 
     # Skip vapor field template for pure mixture cases
