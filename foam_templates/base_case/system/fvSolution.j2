@@ -36,7 +36,7 @@ solvers
         relTol          0;
     }
 
-    "(U|T|k|omega|epsilon)"
+    "(U|T|h|k|omega|epsilon)"
     {
         solver          PBiCGStab;
         preconditioner  DILU;
@@ -44,7 +44,7 @@ solvers
         relTol          0.1;
     }
 
-    "(U|T|k|omega|epsilon)Final"
+    "(U|T|h|k|omega|epsilon)Final"
     {
         $U;
         relTol          0;
