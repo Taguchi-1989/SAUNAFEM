@@ -489,18 +489,18 @@ def solve_two_zone(
         t_upper += dt * dt_upper
 
         # Steam (löyly) — steady-state treatment
-        # The steady-state solver finds the equilibrium AFTER all water has
-        # evaporated. We set the humidity from the total water mass and add
-        # the latent heat as an impulse at iteration 0. The solver then
-        # converges to the post-löyly steady state.
+        # Latent heat is drawn FROM the heater/stones, not created.
+        # The evaporation reduces the effective convective power.
+        # Humidity is set from total water mass (final equilibrium state).
         if water_kg > 0:
             if not steam_applied:
-                q_steam_total = water_kg * L_VAPORIZATION
-                t_upper += q_steam_total / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
                 humidity_ratio = water_kg / max(m_upper, 0.1)
                 total_steam = water_kg
                 peak_steam_rate = water_kg / tau_evap
                 steam_applied = True
+                # Note: no t_upper boost — latent heat comes from stones,
+                # not created from nothing. The steam adds humidity (which
+                # affects h_wall, cp) but does not add net energy to the air.
             v_steam = 0.0
             m_dot_steam = 0.0
         else:
@@ -522,16 +522,17 @@ def solve_two_zone(
 
         m_lower = rho_lower * v_lower
         if m_lower > 0.1:
-            dt_lower = (q_rad_to_walls * f_rad_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
+            # Radiation path depends on wall model:
+            # - lumped: all radiation heats walls, then conducts/convects to air
+            #   → no direct q_rad to air (handled by wall model)
+            # - fixed: radiation goes directly to air (no wall dynamics)
+            q_rad_to_lower = 0.0 if wall_cfg == "lumped" else q_rad_to_walls * f_rad_lower
+            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
         else:
             dt_lower = 0.0
         t_lower += dt * dt_lower
 
-        # --- Interface movement ---
-        # Plume deposits mass into upper layer, pulling interface down
-        # Return flow (wall-driven) pushes interface back up
-        # At steady state these balance
-        v_plume_flow = m_plume / max(rho_upper, 0.5)  # volume flow into upper
+        v_plume_flow = m_plume / max(rho_upper, 0.5)
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
         dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
@@ -782,9 +783,8 @@ def solve_transient(
             peak_steam_rate = max(peak_steam_rate, m_dot_steam)
             total_steam += mass_evap
 
-            q_steam = mass_evap * L_VAPORIZATION  # total energy this step
-            t_upper += q_steam / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
-
+            # Latent heat is drawn from stones/heater, not added to air.
+            # Steam adds humidity but not net thermal energy.
             if m_upper > 0.1:
                 humidity_ratio += mass_evap / m_upper
 
@@ -802,7 +802,8 @@ def solve_transient(
 
         m_lower = rho_lower * v_lower
         if m_lower > 0.1:
-            dt_lower = (q_rad_to_walls * f_rad_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
+            q_rad_to_lower = 0.0 if wall_cfg == "lumped" else q_rad_to_walls * f_rad_lower
+            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
         else:
             dt_lower = 0.0
         t_lower += dt_step * dt_lower
@@ -884,9 +885,8 @@ def solve_transient(
     perceived_upper_arr = perceived_upper_arr[:record_idx]
 
     total_steam = min(total_steam, water_kg) if water_kg > 0 else 0.0
-    beta_aug_applied = beta_aug if (
-        beta_aug > 0 and aufguss_start <= current_time <= aufguss_start + aufguss_duration
-    ) else 0.0
+    # Report beta_aug if aufguss was configured (regardless of current time)
+    beta_aug_applied = beta_aug if beta_aug > 0 else 0.0
     steady = _make_simple_result(
         data=data,
         n_profile=n_profile,
