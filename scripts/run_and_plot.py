@@ -31,12 +31,12 @@ BASE_CFG = {
         "walls": {
             "temperature": 293.15,
             "model": "lumped",
-            "thickness": 0.015,
+            "thickness": 0.08,       # 80mm insulated wood panel
             "conductivity": 0.12,
             "rho_cp": 500000,
         },
         "heater": {
-            "power_kw": 9.0,
+            "power_kw": 18.0,        # ~1 kW/m3 for 18.75 m3 room
             "position": {"x": 0.0, "y": 0.1, "z": 1.25},
             "width": 0.6,
             "height": 0.5,
