@@ -11,6 +11,7 @@ from harness.simple_solver import (
     _compute_view_factors,
     _evaporation_rate,
     _plume_entrainment,
+    _ventilation_flow,
     solve_transient,
     solve_two_zone,
 )
@@ -413,4 +414,210 @@ class TestTransientSolver:
         final_t_upper = float(trans.t_upper_series[-1])
         assert abs(final_t_upper - steady.upper_layer_temp) < 5.0, (
             f"Transient final {final_t_upper:.1f} K vs steady {steady.upper_layer_temp:.1f} K"
+        )
+
+
+def _write_vent_yaml(tmp_path: Path, **overrides) -> Path:
+    """Helper to create a case YAML with natural ventilation."""
+    data = {
+        "case": {"name": "vent_test", "description": "test", "type": "steady"},
+        "geometry": {
+            "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+            "mesh_level": "M0",
+        },
+        "boundary_conditions": {
+            "walls": {"temperature": 293.15, "type": "mixed"},
+            "heater": {
+                "power_kw": 9.0,
+                "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                "width": 0.6,
+                "height": 0.5,
+            },
+        },
+        "solver": {
+            "name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+        },
+        "ventilation": {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.02, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.02, "Cd": 0.6},
+            "T_ambient": 293.15,
+            "w_ambient": 0.005,
+        },
+        "probes": [
+            {"name": "upper_bench", "position": {"x": 1.5, "y": 2.0, "z": 1.25}},
+            {"name": "lower_bench", "position": {"x": 1.5, "y": 0.8, "z": 1.25}},
+            {"name": "floor_level", "position": {"x": 1.5, "y": 0.1, "z": 1.25}},
+        ],
+    }
+    for key, val in overrides.items():
+        if key == "vent_area":
+            data["ventilation"]["supply"]["area"] = val
+            data["ventilation"]["exhaust"]["area"] = val
+    path = tmp_path / "vent_case.yaml"
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f)
+    return path
+
+
+class TestVentilationFlow:
+    def test_zero_delta_t_gives_zero_flow(self) -> None:
+        """When interior equals ambient, no stack-driven flow."""
+        cfg = {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.02, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.02, "Cd": 0.6},
+            "T_ambient": 350.0,
+        }
+        m = _ventilation_flow(350.0, 350.0, 1.5, cfg)
+        assert m == 0.0
+
+    def test_positive_flow_when_hot(self) -> None:
+        """Stack effect drives positive flow when interior is hotter."""
+        cfg = {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.02, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.02, "Cd": 0.6},
+            "T_ambient": 293.15,
+        }
+        m = _ventilation_flow(370.0, 320.0, 1.5, cfg)
+        assert m > 0.0
+
+    def test_higher_temp_more_flow(self) -> None:
+        """Higher interior temperature should drive more ventilation flow."""
+        cfg = {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.02, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.02, "Cd": 0.6},
+            "T_ambient": 293.15,
+        }
+        m_lo = _ventilation_flow(340.0, 310.0, 1.5, cfg)
+        m_hi = _ventilation_flow(400.0, 340.0, 1.5, cfg)
+        assert m_hi > m_lo
+
+    def test_larger_area_more_flow(self) -> None:
+        """Larger vent area should increase flow rate."""
+        cfg_small = {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.01, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.01, "Cd": 0.6},
+            "T_ambient": 293.15,
+        }
+        cfg_large = {
+            "model": "natural",
+            "supply": {"height": 0.3, "area": 0.04, "Cd": 0.6},
+            "exhaust": {"height": 2.0, "area": 0.04, "Cd": 0.6},
+            "T_ambient": 293.15,
+        }
+        m_small = _ventilation_flow(370.0, 320.0, 1.5, cfg_small)
+        m_large = _ventilation_flow(370.0, 320.0, 1.5, cfg_large)
+        assert m_large > m_small
+
+    def test_inverted_vents_zero_flow(self) -> None:
+        """Exhaust below supply gives zero flow."""
+        cfg = {
+            "model": "natural",
+            "supply": {"height": 2.0, "area": 0.02, "Cd": 0.6},
+            "exhaust": {"height": 0.3, "area": 0.02, "Cd": 0.6},
+            "T_ambient": 293.15,
+        }
+        m = _ventilation_flow(370.0, 320.0, 1.5, cfg)
+        assert m == 0.0
+
+
+class TestVentilationIntegration:
+    def test_vent_converges(self, tmp_path: Path) -> None:
+        """Solver with ventilation should converge."""
+        path = _write_vent_yaml(tmp_path)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.converged is True
+
+    def test_vent_reduces_upper_temp(self, tmp_path: Path) -> None:
+        """Ventilation should cool the upper layer compared to sealed case."""
+        (tmp_path / "sealed").mkdir()
+        (tmp_path / "vent").mkdir()
+        path_sealed = _write_case_yaml(tmp_path / "sealed")
+        path_vent = _write_vent_yaml(tmp_path / "vent")
+
+        r_sealed = solve_two_zone(path_sealed, max_iter=10000)
+        r_vent = solve_two_zone(path_vent, max_iter=10000)
+
+        assert r_vent.upper_layer_temp < r_sealed.upper_layer_temp, (
+            f"Ventilation should cool: sealed={r_sealed.upper_layer_temp:.1f} K, "
+            f"vent={r_vent.upper_layer_temp:.1f} K"
+        )
+
+    def test_vent_mass_flow_positive(self, tmp_path: Path) -> None:
+        """Ventilation mass flow rate should be positive in the result."""
+        path = _write_vent_yaml(tmp_path)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.vent_mass_flow > 0.0
+
+    def test_no_vent_default(self, tmp_path: Path) -> None:
+        """Standard case without ventilation key should have zero vent flow."""
+        path = _write_case_yaml(tmp_path)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.vent_mass_flow == 0.0
+
+    def test_vent_none_model_disabled(self, tmp_path: Path) -> None:
+        """Ventilation with model='none' should behave as sealed."""
+        data = {
+            "case": {"name": "test", "description": "test", "type": "steady"},
+            "geometry": {
+                "dimensions": {"x": 3.0, "y": 2.5, "z": 2.5},
+                "mesh_level": "M0",
+            },
+            "boundary_conditions": {
+                "walls": {"temperature": 293.15, "type": "mixed"},
+                "heater": {
+                    "power_kw": 9.0,
+                    "position": {"x": 0.0, "y": 0.1, "z": 1.25},
+                    "width": 0.6,
+                    "height": 0.5,
+                },
+            },
+            "solver": {
+                "name": "buoyantPimpleFoam",
+                "end_time": 300,
+                "write_interval": 10,
+                "delta_t": 0.05,
+                "averaging_start": 150,
+            },
+            "ventilation": {"model": "none"},
+            "probes": [
+                {"name": "upper_bench", "position": {"x": 1.5, "y": 2.0, "z": 1.25}},
+                {"name": "lower_bench", "position": {"x": 1.5, "y": 0.8, "z": 1.25}},
+                {"name": "floor_level", "position": {"x": 1.5, "y": 0.1, "z": 1.25}},
+            ],
+        }
+        path = tmp_path / "vent_none.yaml"
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.vent_mass_flow == 0.0
+
+    def test_vent_stratification_preserved(self, tmp_path: Path) -> None:
+        """Even with ventilation, upper layer should still be hotter than lower."""
+        path = _write_vent_yaml(tmp_path)
+        result = solve_two_zone(path, max_iter=10000)
+        assert result.upper_layer_temp > result.lower_layer_temp
+
+    def test_transient_vent_cools(self, tmp_path: Path) -> None:
+        """Transient solver with ventilation should also show cooling effect."""
+        (tmp_path / "sealed").mkdir()
+        (tmp_path / "vent").mkdir()
+        path_sealed = _write_case_yaml(tmp_path / "sealed")
+        path_vent = _write_vent_yaml(tmp_path / "vent")
+
+        r_sealed = solve_transient(path_sealed, end_time=500.0, physical_dt=1.0, record_interval=10.0)
+        r_vent = solve_transient(path_vent, end_time=500.0, physical_dt=1.0, record_interval=10.0)
+
+        # Final upper temp with vent should be lower
+        assert float(r_vent.t_upper_series[-1]) < float(r_sealed.t_upper_series[-1]), (
+            f"Ventilation transient should cool: sealed={float(r_sealed.t_upper_series[-1]):.1f} K, "
+            f"vent={float(r_vent.t_upper_series[-1]):.1f} K"
         )

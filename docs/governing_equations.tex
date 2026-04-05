@@ -885,6 +885,124 @@ PoC フェーズに適している。
 
 \bigskip\hrule\bigskip
 
+\subsection{10. 換気モデル (Natural Ventilation)}
+
+\subsubsection{10.1 モデル概要}
+
+実サウナには給気口（床付近・ヒーター近傍）と排気口（天井付近）があり、
+室内外温度差による煙突効果（stack effect）で自然換気が発生する。
+従来の密閉箱仮定（sealed-box assumption）を除去し、
+任意の給排気構成をサポートする。
+
+\begin{verbatim}
+ ┌──────────────────────────────────┐  ← ceiling
+ │         上層 (T_upper)            │
+ │                            [排気] ← z_exhaust (排気口高さ)
+ ├ ─ ─ ─ ─ ─ ─ z_int ─ ─ ─ ─ ─ ─ ─┤  ← 界面
+ │         下層 (T_lower)            │
+ │  [給気] ←  z_supply (給気口高さ)   │
+ │          ↑ プルーム               │
+ │         [H] ヒーター               │
+ └──────────────────────────────────┘  ← floor
+     T_ambient (外気温)
+\end{verbatim}
+
+\texttt{model: "none"} (デフォルト) で従来の密閉モデル、
+\texttt{model: "natural"} で自然換気モデルを選択。
+
+\subsubsection{10.2 煙突効果による駆動圧力}
+
+給気口と排気口の高さ差による温度差駆動圧力（stack pressure）:
+
+$
+\Delta p = \rho_{\text{amb}} \, g \, (z_{\text{exhaust}} - z_{\text{supply}}) \,
+\frac{T_{\text{exhaust}} - T_{\text{ambient}}}{T_{\text{ambient}}}
+$
+
+ここで:
+
+\begin{itemize} \item $\rho_{\text{amb}}$: 外気密度 [kg/m³] \end{itemize}
+\begin{itemize} \item $z_{\text{exhaust}}, z_{\text{supply}}$: 排気口・給気口の高さ [m] \end{itemize}
+\begin{itemize} \item $T_{\text{exhaust}}$: 排気口位置のゾーン温度（界面位置に応じて $T_{\text{upper}}$ または $T_{\text{lower}}$） \end{itemize}
+\begin{itemize} \item $T_{\text{ambient}}$: 外気温 [K] \end{itemize}
+
+\subsubsection{10.3 オリフィス流量モデル}
+
+有効開口面積を用いた質量流量:
+
+$
+\dot{m}_{\text{vent}} = C_d A_{\text{eff}} \sqrt{2 \rho_{\text{supply}} |\Delta p|}
+$
+
+ここで:
+
+\begin{itemize} \item $C_d A_{\text{eff}} = \min(C_{d,s} A_s, \, C_{d,e} A_e)$: 有効開口面積（流量は狭い方で制限） \end{itemize}
+\begin{itemize} \item $\rho_{\text{supply}}$: 給気口位置の空気密度 [kg/m³] \end{itemize}
+\begin{itemize} \item $\dot{m}_{\text{vent}} \ge 0$: 自然換気では正（流入）方向のみ \end{itemize}
+
+\subsubsection{10.4 エネルギー保存への寄与}
+
+\paragraph{下層（給気側）}
+
+外気が $T_{\text{ambient}}$ で流入し、下層空気と混合:
+
+$
+Q_{\text{vent,lower}} = \dot{m}_{\text{vent}} \, c_p \, (T_{\text{ambient}} - T_{\text{lower}})
+$
+
+（$T_{\text{ambient}} < T_{\text{lower}}$ のとき冷却効果）
+
+\paragraph{上層（排気側）}
+
+排気口から $T_{\text{upper}}$ の空気が排出され、界面から $T_{\text{lower}}$ の空気で置換:
+
+$
+Q_{\text{vent,upper}} = \dot{m}_{\text{vent}} \, c_p \, (T_{\text{lower}} - T_{\text{upper}})
+$
+
+（常に冷却効果: 高温の上層空気が低温の下層空気で置換される）
+
+\subsubsection{10.5 界面高さへの寄与}
+
+給気は下層に体積を追加し、界面を上方に押し上げる:
+
+$
+A_{\text{floor}} \, \frac{dz_{\text{int}}}{dt}
+= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}}
++ \frac{\dot{m}_{\text{vent}}}{\rho_{\text{lower}}}
+$
+
+定常状態では、プルームによる界面降下と換気・壁面還流による界面上昇がバランスする。
+
+\subsubsection{10.6 湿度への寄与（過渡計算時）}
+
+外気は低湿度（$w_{\text{ambient}}$）であり、ロウリュ後の湿度減衰メカニズムとなる:
+
+$
+\frac{dw}{dt} = \frac{\dot{m}_{\text{vent}}}{m_{\text{upper}}} (w_{\text{ambient}} - w)
+$
+
+この1次減衰により、換気が活発なほどロウリュ後の湿度ピークからの回復が早くなる。
+
+\subsubsection{10.7 YAML 構成例}
+
+\begin{verbatim}
+ventilation:
+  model: "natural"       # "natural" or "none" (default)
+  supply:
+    height: 0.3          # m above floor
+    area: 0.02           # m^2 (e.g. 20cm x 10cm vent)
+    Cd: 0.6              # discharge coefficient
+  exhaust:
+    height: 2.0          # m above floor (near ceiling)
+    area: 0.02           # m^2
+    Cd: 0.6
+  T_ambient: 293.15      # K (outside temperature)
+  w_ambient: 0.005       # kg/kg (outside humidity ratio)
+\end{verbatim}
+
+\bigskip\hrule\bigskip
+
 \subsection{付録 A: フェーズ別の実装状況}
 
 {\small

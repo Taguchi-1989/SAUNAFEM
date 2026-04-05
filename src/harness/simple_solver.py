@@ -25,6 +25,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import math
+
 import numpy as np
 
 from harness.schema import load_yaml
@@ -48,6 +50,7 @@ class SimpleSolverResult:
     steam_mass_flow: float = 0.0      # peak evaporation rate [kg/s]
     total_steam_generated: float = 0.0 # cumulative steam mass [kg]
     beta_aug_applied: float = 0.0  # forced mixing coefficient used [kg/s]
+    vent_mass_flow: float = 0.0        # ventilation mass flow rate [kg/s]
     wall_inner_temp: float = 293.15    # inner wall surface temperature [K]
     humidity_ratio: float = 0.0        # kg vapor / kg dry air
     relative_humidity: float = 0.0     # 0-1
@@ -184,6 +187,73 @@ def _evaporation_rate(
     return (water_mass_kg / tau_evap) * np.exp(-elapsed / tau_evap)
 
 
+def _ventilation_flow(
+    t_upper: float,
+    t_lower: float,
+    z_int: float,
+    vent_cfg: dict,
+    rho_0: float = 1.1,
+    g: float = 9.81,
+) -> float:
+    """Compute natural ventilation mass flow rate via stack effect.
+
+    Stack pressure: dp = rho_amb * g * (z_exhaust - z_supply) * (T_hot - T_amb) / T_amb
+    Orifice flow:   m_dot = Cd_eff * A_eff * sqrt(2 * rho * |dp|) * sign(dp)
+
+    Args:
+        t_upper: Upper layer temperature [K].
+        t_lower: Lower layer temperature [K].
+        z_int: Interface height [m].
+        vent_cfg: Ventilation config dict with 'supply', 'exhaust', 'T_ambient'.
+        rho_0: Reference air density [kg/m3].
+        g: Gravitational acceleration [m/s2].
+
+    Returns:
+        Mass flow rate [kg/s] (positive = inflow through supply).
+    """
+    supply = vent_cfg["supply"]
+    exhaust = vent_cfg["exhaust"]
+    t_ambient = vent_cfg.get("T_ambient", 293.15)
+
+    z_supply = supply["height"]
+    z_exhaust = exhaust["height"]
+    a_supply = supply["area"]
+    a_exhaust = exhaust["area"]
+    cd_supply = supply.get("Cd", 0.6)
+    cd_exhaust = exhaust.get("Cd", 0.6)
+
+    if z_exhaust <= z_supply:
+        return 0.0
+
+    # Temperature at each vent height
+    t_at_supply = t_lower if z_supply < z_int else t_upper
+    t_at_exhaust = t_upper if z_exhaust > z_int else t_lower
+
+    # Ambient density
+    rho_ambient = rho_0 * 300.0 / max(t_ambient, 250.0)
+
+    # Stack effect pressure difference
+    delta_p = rho_ambient * g * (z_exhaust - z_supply) * (t_at_exhaust - t_ambient) / max(t_ambient, 250.0)
+
+    # Effective orifice area (balanced flow: limited by smaller vent)
+    a_eff = min(cd_supply * a_supply, cd_exhaust * a_exhaust)
+
+    # Density at supply vent for mass flow calculation
+    rho_at_supply = rho_0 * 300.0 / max(t_at_supply, 250.0)
+
+    # Orifice mass flow
+    if abs(delta_p) < 1e-6:
+        return 0.0
+
+    m_dot = a_eff * math.sqrt(2.0 * rho_at_supply * abs(delta_p))
+    if delta_p < 0:
+        m_dot = -m_dot
+
+    # Only positive (inflow) makes physical sense for natural ventilation
+    # when sauna interior is hotter than ambient
+    return max(m_dot, 0.0)
+
+
 def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, float]:
     """Compute humid air mixture properties.
 
@@ -299,6 +369,7 @@ def _make_simple_result(
     beta_aug_applied: float,
     t_wall_inner: float,
     humidity_ratio: float,
+    vent_mass_flow: float = 0.0,
 ) -> SimpleSolverResult:
     """Assemble a ``SimpleSolverResult`` from the current zone state."""
     y, temperatures, probe_values = _build_profile_and_probes(
@@ -329,6 +400,7 @@ def _make_simple_result(
         steam_mass_flow=float(peak_steam_rate),
         total_steam_generated=float(total_steam),
         beta_aug_applied=float(beta_aug_applied),
+        vent_mass_flow=float(vent_mass_flow),
         wall_inner_temp=float(t_wall_inner),
         humidity_ratio=float(humidity_ratio),
         relative_humidity=float(props_upper["relative_humidity"]),
@@ -405,6 +477,10 @@ def solve_two_zone(
         aufguss_start = 0.0
         aufguss_duration = 0.0
 
+    # Ventilation parameters
+    vent_cfg = data.get("ventilation")
+    vent_enabled = vent_cfg is not None and vent_cfg.get("model", "none") != "none"
+
     # Convective fraction of heater output (rest is radiant to walls)
     f_conv = 0.7
     q_conv = power_w * f_conv
@@ -474,8 +550,20 @@ def solve_two_zone(
         h_wall = props["h_wall_eff"]
         cp_eff = props["cp_mix"]
 
+        # --- Ventilation flow ---
+        if vent_enabled:
+            m_vent = _ventilation_flow(t_upper, t_lower, z_int, vent_cfg, rho_0)
+            t_ambient_vent = vent_cfg.get("T_ambient", 293.15)
+            w_ambient_vent = vent_cfg.get("w_ambient", 0.005)
+        else:
+            m_vent = 0.0
+            t_ambient_vent = t_wall
+            w_ambient_vent = 0.0
+
         # --- Upper layer energy balance ---
         q_plume_in = m_plume * cp_eff * (t_plume - t_upper)
+        # Ventilation: exhausted upper-layer air replaced by lower-layer air
+        q_vent_upper = m_vent * cp_eff * (t_lower - t_upper) if vent_enabled else 0.0
 
         upper_height = height - z_int
         a_wall_upper = perimeter * upper_height + a_floor
@@ -485,7 +573,7 @@ def solve_two_zone(
         q_rad_to_walls = power_w * (1.0 - f_conv)
 
         m_upper = rho_upper * v_upper
-        dt_upper = (q_plume_in - q_wall_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
+        dt_upper = (q_plume_in - q_wall_upper + q_vent_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
         t_upper += dt * dt_upper
 
         # Steam (löyly) — steady-state treatment
@@ -517,6 +605,9 @@ def solve_two_zone(
         k_interface = 0.5  # effective interface conductivity [W/(m*K)]
         q_interface = k_interface * a_floor * (t_upper - t_lower) / (height * 0.1)
 
+        # Ventilation: fresh ambient air enters lower layer
+        q_vent_lower = m_vent * cp_eff * (t_ambient_vent - t_lower) if vent_enabled else 0.0
+
         # Heat removed by plume entrainment (air leaves lower layer at t_lower)
         # This is already accounted in the plume model
 
@@ -527,7 +618,7 @@ def solve_two_zone(
             #   → no direct q_rad to air (handled by wall model)
             # - fixed: radiation goes directly to air (no wall dynamics)
             q_rad_to_lower = 0.0 if wall_cfg == "lumped" else q_rad_to_walls * f_rad_lower
-            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
+            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower + q_vent_lower) / (m_lower * cp_eff)
         else:
             dt_lower = 0.0
         t_lower += dt * dt_lower
@@ -535,7 +626,9 @@ def solve_two_zone(
         v_plume_flow = m_plume / max(rho_upper, 0.5)
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
-        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
+        # Ventilation: supply adds volume to lower layer (pushes interface up)
+        v_vent = m_vent / max(rho_lower, 0.5) if vent_enabled else 0.0
+        dz_int = (-v_plume_flow + v_return - v_steam + v_vent) / a_floor
         z_int += dt * dz_int
 
         # Clamp
@@ -600,6 +693,7 @@ def solve_two_zone(
         beta_aug_applied=beta_aug,
         t_wall_inner=t_wall_inner,
         humidity_ratio=humidity_ratio,
+        vent_mass_flow=m_vent if vent_enabled else 0.0,
     )
 
 
@@ -668,6 +762,10 @@ def solve_transient(
         beta_aug = 0.0
         aufguss_start = 0.0
         aufguss_duration = 0.0
+
+    # Ventilation parameters
+    vent_cfg = data.get("ventilation")
+    vent_enabled = vent_cfg is not None and vent_cfg.get("model", "none") != "none"
 
     f_conv = 0.7
     q_conv = power_w * f_conv
@@ -758,8 +856,20 @@ def solve_transient(
         h_wall = props["h_wall_eff"]
         cp_eff = props["cp_mix"]
 
+        # Ventilation flow
+        if vent_enabled:
+            m_vent = _ventilation_flow(t_upper, t_lower, z_int, vent_cfg, rho_0)
+            t_ambient_vent = vent_cfg.get("T_ambient", 293.15)
+            w_ambient_vent = vent_cfg.get("w_ambient", 0.005)
+        else:
+            m_vent = 0.0
+            t_ambient_vent = t_wall
+            w_ambient_vent = 0.0
+
         # Upper layer energy balance
         q_plume_in = m_plume * cp_eff * (t_plume - t_upper)
+        # Ventilation: exhausted upper-layer air replaced by lower-layer air
+        q_vent_upper = m_vent * cp_eff * (t_lower - t_upper) if vent_enabled else 0.0
 
         upper_height = height - z_int
         a_wall_upper = perimeter * upper_height + a_floor
@@ -768,7 +878,7 @@ def solve_transient(
         q_rad_to_walls = power_w * (1.0 - f_conv)
 
         m_upper = rho_upper * v_upper
-        dt_upper = (q_plume_in - q_wall_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
+        dt_upper = (q_plume_in - q_wall_upper + q_vent_upper) / (m_upper * cp_eff) if m_upper > 0.1 else 0.0
         t_upper += dt_step * dt_upper
 
         # Steam injection (loyly) — interval-integrated evaporation
@@ -793,6 +903,13 @@ def solve_transient(
             m_dot_steam = 0.0
             v_steam = 0.0
 
+        # Ventilation humidity decay: fresh air dilutes indoor humidity
+        if vent_enabled and m_vent > 0 and m_upper > 0.1:
+            # Humidity change: supply brings w_ambient, exhaust removes w_upper
+            dw = m_vent * (w_ambient_vent - humidity_ratio) / m_upper
+            humidity_ratio += dt_step * dw
+            humidity_ratio = max(humidity_ratio, 0.0)
+
         # Lower layer energy balance
         a_wall_lower = perimeter * z_int + a_floor
         q_wall_lower = h_wall * a_wall_lower * (t_lower - t_wall_inner)
@@ -800,10 +917,13 @@ def solve_transient(
         k_interface = 0.5
         q_interface = k_interface * a_floor * (t_upper - t_lower) / (height * 0.1)
 
+        # Ventilation: fresh ambient air enters lower layer
+        q_vent_lower = m_vent * cp_eff * (t_ambient_vent - t_lower) if vent_enabled else 0.0
+
         m_lower = rho_lower * v_lower
         if m_lower > 0.1:
             q_rad_to_lower = 0.0 if wall_cfg == "lumped" else q_rad_to_walls * f_rad_lower
-            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower) / (m_lower * cp_eff)
+            dt_lower = (q_rad_to_lower + q_interface - q_wall_lower + q_vent_lower) / (m_lower * cp_eff)
         else:
             dt_lower = 0.0
         t_lower += dt_step * dt_lower
@@ -812,7 +932,9 @@ def solve_transient(
         v_plume_flow = m_plume / max(rho_upper, 0.5)
         dt_layers = max(t_upper - t_lower, 1.0)
         v_return = h_wall * a_wall_upper * (t_upper - t_wall_inner) / (rho_upper * cp_eff * dt_layers)
-        dz_int = (-v_plume_flow + v_return - v_steam) / a_floor
+        # Ventilation: supply adds volume to lower layer (pushes interface up)
+        v_vent = m_vent / max(rho_lower, 0.5) if vent_enabled else 0.0
+        dz_int = (-v_plume_flow + v_return - v_steam + v_vent) / a_floor
         z_int += dt_step * dz_int
 
         # Clamp
@@ -906,6 +1028,7 @@ def solve_transient(
         beta_aug_applied=beta_aug_applied,
         t_wall_inner=t_wall_inner,
         humidity_ratio=humidity_ratio,
+        vent_mass_flow=m_vent if vent_enabled else 0.0,
     )
 
     return TransientResult(
