@@ -10,6 +10,7 @@ FoamFile
 buoyancyProduction
 {
     type            scalarCodedSource;
+    name            buoyancyProductionK;
     active          true;
     selectionMode   all;
 
@@ -17,7 +18,6 @@ buoyancyProduction
     {
         selectionMode   all;
         fields          (k);
-        name            buoyancyProductionK;
 
         codeInclude
         #{
