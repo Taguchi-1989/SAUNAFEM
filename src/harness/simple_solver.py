@@ -81,8 +81,8 @@ def _compute_view_factors(
     more upward. The opposite wall receives radiation based on the
     heater's angular extent.
 
-    Returns dict with keys: 'floor', 'lower_walls', 'upper_walls', 'ceiling'.
-    All values sum to ~1.0 (enclosure closure rule).
+    Returns dict with keys: 'floor', 'lower_walls', 'upper_walls',
+    'ceiling', 'body'.  All values sum to ~1.0 (enclosure closure rule).
     """
     h_center = heater_y + heater_h / 2.0
 
@@ -122,11 +122,31 @@ def _compute_view_factors(
     f_lower_walls = f_sides * frac_below + f_opposite * frac_below
     f_upper_walls = f_sides * frac_above + f_opposite * frac_above
 
+    # --- Heater-to-body view factor ---
+    # Person on upper bench, roughly 1.5 m from heater horizontally.
+    # Approximate as small target (human front surface ~0.6 m wide, ~0.5 m high)
+    # at distance d from heater.  F = A_person / (2*pi*d^2) (point-to-small-area).
+    body_width = 0.6   # m, approximate torso width
+    body_height = 0.5  # m, seated torso height
+    d_body = max(np.sqrt(room_w**2 + (room_h * 0.8 - h_center)**2), 0.5)
+    f_body_raw = (body_width * body_height) / (2.0 * np.pi * d_body**2)
+    f_body = float(np.clip(f_body_raw, 0.005, 0.10))
+
+    # Renormalise wall factors so total (walls + body) ≈ 1.0
+    f_walls_total = (
+        float(np.clip(f_floor_raw, 0.01, 0.6))
+        + float(np.clip(f_lower_walls, 0.01, 0.5))
+        + float(np.clip(f_upper_walls, 0.01, 0.5))
+        + float(np.clip(f_ceiling_raw, 0.01, 0.6))
+    )
+    scale_walls = (1.0 - f_body) / f_walls_total if f_walls_total > 0 else 1.0
+
     return {
-        "floor": float(np.clip(f_floor_raw, 0.01, 0.6)),
-        "lower_walls": float(np.clip(f_lower_walls, 0.01, 0.5)),
-        "upper_walls": float(np.clip(f_upper_walls, 0.01, 0.5)),
-        "ceiling": float(np.clip(f_ceiling_raw, 0.01, 0.6)),
+        "floor": float(np.clip(f_floor_raw, 0.01, 0.6)) * scale_walls,
+        "lower_walls": float(np.clip(f_lower_walls, 0.01, 0.5)) * scale_walls,
+        "upper_walls": float(np.clip(f_upper_walls, 0.01, 0.5)) * scale_walls,
+        "ceiling": float(np.clip(f_ceiling_raw, 0.01, 0.6)) * scale_walls,
+        "body": f_body,
     }
 
 
@@ -193,15 +213,73 @@ def _evaporation_rate(
     return (water_mass_kg / tau_evap) * np.exp(-elapsed / tau_evap)
 
 
-def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, float]:
+def _perceived_temperature(t_c: float, rh: float, q_rad_body: float = 0.0) -> float:
+    """Skin heat balance equivalent temperature for sauna conditions.
+
+    Replaces the Steadman (1979) outdoor heat-index formula which is only
+    valid for 20-50 degC.  This model is physically sound up to ~120 degC.
+
+    Physics:
+      q_conv  = h_conv * (T_air - T_skin)          convective heat gain
+      q_evap  = Lewis-relation evaporative term     (cooling or condensation heating)
+      q_rad   = direct radiative flux from heater   (passed in)
+      T_eq    = T_skin + q_total / h_ref            normalised equivalent temperature
+
+    Args:
+        t_c: Air dry-bulb temperature [degC].
+        rh: Relative humidity [0-1].
+        q_rad_body: Direct radiative heat flux on body [W/m2] (from heater).
+
+    Returns:
+        Equivalent perceived temperature [degC].
+    """
+    T_SKIN = 36.0    # mean skin temperature [degC]
+    H_CONV = 8.0     # convective HTC [W/(m2*K)]
+    H_REF = 10.0     # reference HTC for normalisation [W/(m2*K)]
+
+    # Convective heat gain
+    q_conv = H_CONV * (t_c - T_SKIN)
+
+    # Saturation vapour pressures (Magnus / August-Roche-Magnus formula) [Pa]
+    p_sat_skin = 610.78 * np.exp(17.27 * T_SKIN / (T_SKIN + 237.3))
+    p_sat_air = 610.78 * np.exp(17.27 * t_c / (t_c + 237.3)) if t_c > -40.0 else 610.78
+    p_vapor = rh * p_sat_air
+
+    # Evaporative / condensation term via simplified Lewis relation
+    # h_e ~ 16.5 * h_conv [W/(m2*kPa)] (Lewis factor for air-water)
+    # Skin wettedness w limits actual evaporation (0.4 typical in sauna;
+    # full body sweating but not every surface is fully wet).
+    W_SKIN = 0.4  # skin wettedness fraction [-]
+    Q_EVAP_MAX = 400.0  # physiological max evaporative cooling [W/m2]
+    p_sat_skin_kpa = p_sat_skin / 1000.0
+    p_vapor_kpa = p_vapor / 1000.0
+    if p_vapor > p_sat_skin:
+        # Condensation on skin surface → adds heat (wettedness irrelevant)
+        q_evap = 16.5 * H_CONV * (p_vapor_kpa - p_sat_skin_kpa)
+    else:
+        # Evaporative cooling (sweat), limited by skin wettedness and physiology
+        q_evap_raw = 16.5 * H_CONV * (p_sat_skin_kpa - p_vapor_kpa)
+        q_evap = -min(W_SKIN * q_evap_raw, Q_EVAP_MAX)
+
+    # Total heat flux on body
+    q_total = q_conv + q_rad_body + q_evap
+
+    # Equivalent temperature: dry-air temperature at H_REF giving same flux
+    return T_SKIN + q_total / H_REF
+
+
+def _humid_air_properties(
+    t_k: float, humidity_ratio: float = 0.0, q_rad_body: float = 0.0,
+) -> dict[str, float]:
     """Compute humid air mixture properties.
 
     Args:
         t_k: Temperature [K].
         humidity_ratio: kg water vapor per kg dry air (absolute humidity).
+        q_rad_body: Direct radiative heat flux on body [W/m2] (from heater).
 
     Returns:
-        dict with cp_mix, lambda_mix, h_wall_eff, and perceived_temp.
+        dict with cp_mix, lambda_mix, h_wall_eff, perceived_temp_c, etc.
     """
     # Dry air properties
     cp_air = 1005.0  # J/(kg*K)
@@ -223,9 +301,6 @@ def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, 
     h_ratio = (cp_mix / cp_air) ** 0.25 * (lambda_mix / lambda_air) ** 0.75
     h_wall_eff = 8.0 * h_ratio
 
-    # Perceived temperature (simplified wet-bulb approximation)
-    # Humid air feels hotter because it impedes evaporative cooling from skin
-    # WBGT-like index: T_perceived ≈ T_dry + humidity_effect
     t_c = t_k - 273.15
     # Antoine equation for saturation pressure [Pa] at T [K]
     if t_k > 273.15:
@@ -237,11 +312,8 @@ def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, 
     p_vapor = w * p_atm / (0.622 + w) if w > 0 else 0.0
     rh = min(p_vapor / p_sat, 1.0) if p_sat > 0 else 0.0
 
-    # Simplified perceived temperature (Steadman 1979 heat index approximation)
-    if t_c > 27 and rh > 0.05:
-        perceived_c = t_c + 0.33 * (rh * p_sat / 1000.0) - 4.0
-    else:
-        perceived_c = t_c
+    # Skin heat balance perceived temperature (valid for sauna range 60-120 degC)
+    perceived_c = _perceived_temperature(t_c, rh, q_rad_body)
 
     return {
         "cp_mix": cp_mix,
@@ -251,6 +323,49 @@ def _humid_air_properties(t_k: float, humidity_ratio: float = 0.0) -> dict[str, 
         "relative_humidity": rh,
         "perceived_temp_c": perceived_c,
     }
+
+
+def _q_rad_body(
+    power_w: float,
+    f_conv: float,
+    f_body: float,
+    heater_w: float,
+    heater_h: float,
+    t_wall_inner_k: float,
+) -> float:
+    """Radiative heat flux from heater directly to a person's body [W/m2].
+
+    Estimates the heater surface temperature from its radiant power output
+    and the heater area, then computes the net radiative flux intercepted
+    by the body using the heater-to-body view factor.
+
+    Args:
+        power_w: Total heater power [W].
+        f_conv: Convective fraction of heater output (rest is radiant).
+        f_body: View factor from heater to body (from _compute_view_factors).
+        heater_w: Heater width [m].
+        heater_h: Heater height [m].
+        t_wall_inner_k: Inner wall surface temperature [K] (used as ambient
+            radiative reference for heater surface temperature estimate).
+
+    Returns:
+        Radiative heat flux on the body [W/m2].
+    """
+    SIGMA = 5.67e-8       # Stefan-Boltzmann constant [W/(m2*K4)]
+    EPSILON_BODY = 0.97   # human skin emissivity
+    T_SKIN_K = 36.0 + 273.15
+
+    a_heater = max(heater_w * heater_h, 0.01)
+    q_rad_total = power_w * (1.0 - f_conv)  # total radiant output [W]
+    q_heater_surface = q_rad_total / a_heater  # [W/m2]
+
+    # Estimate heater surface temperature from radiant flux
+    t_heater_k = (q_heater_surface / (EPSILON_BODY * SIGMA) + t_wall_inner_k**4) ** 0.25
+
+    # Net radiative heat flux intercepted by the body
+    return float(
+        EPSILON_BODY * SIGMA * f_body * (t_heater_k**4 - T_SKIN_K**4)
+    )
 
 
 def _build_profile_and_probes(
@@ -308,6 +423,7 @@ def _make_simple_result(
     beta_aug_applied: float,
     t_wall_inner: float,
     humidity_ratio: float,
+    q_rad_body: float = 0.0,
 ) -> SimpleSolverResult:
     """Assemble a ``SimpleSolverResult`` from the current zone state."""
     y, temperatures, probe_values = _build_profile_and_probes(
@@ -321,7 +437,7 @@ def _make_simple_result(
         t_upper=t_upper,
         t_plume=t_plume,
     )
-    props_upper = _humid_air_properties(t_upper, humidity_ratio)
+    props_upper = _humid_air_properties(t_upper, humidity_ratio, q_rad_body)
     props_lower = _humid_air_properties(t_lower, humidity_ratio * 0.3)
 
     return SimpleSolverResult(
@@ -387,10 +503,12 @@ def solve_two_zone(
     heater_h = heater.get("height", 0.5)
     heater_center_y = heater_y + heater_h / 2.0
 
+    heater_w = heater.get("width", 0.6)
+
     # View factor radiation model
-    vf = _compute_view_factors(width, depth, height, heater_y, heater_h,
-                                heater.get("width", 0.6))
+    vf = _compute_view_factors(width, depth, height, heater_y, heater_h, heater_w)
     f_rad_lower = vf["floor"] + vf["lower_walls"]
+    f_body = vf["body"]
 
     # Löyly (steam) parameters
     loyly = data.get("loyly")
@@ -600,6 +718,11 @@ def solve_two_zone(
 
     total_steam = min(total_steam, water_kg) if water_kg > 0 else 0.0
 
+    # Direct radiation from heater to body
+    q_rad_body_val = _q_rad_body(
+        power_w, f_conv, f_body, heater_w, heater_h, t_wall_inner,
+    )
+
     return _make_simple_result(
         data=data,
         n_profile=n_profile,
@@ -619,6 +742,7 @@ def solve_two_zone(
         beta_aug_applied=beta_aug,
         t_wall_inner=t_wall_inner,
         humidity_ratio=humidity_ratio,
+        q_rad_body=q_rad_body_val,
     )
 
 
@@ -662,9 +786,11 @@ def solve_transient(
     heater_h = heater.get("height", 0.5)
     heater_center_y = heater_y + heater_h / 2.0
 
-    vf = _compute_view_factors(width, depth, height, heater_y, heater_h,
-                                heater.get("width", 0.6))
+    heater_w = heater.get("width", 0.6)
+
+    vf = _compute_view_factors(width, depth, height, heater_y, heater_h, heater_w)
     f_rad_lower = vf["floor"] + vf["lower_walls"]
+    f_body = vf["body"]
 
     # Loyly parameters
     loyly = data.get("loyly")
@@ -736,7 +862,8 @@ def solve_transient(
     next_record_time = 0.0
 
     # Record initial state
-    props_init = _humid_air_properties(t_upper, humidity_ratio)
+    q_rad_body_val = _q_rad_body(power_w, f_conv, f_body, heater_w, heater_h, t_wall_inner)
+    props_init = _humid_air_properties(t_upper, humidity_ratio, q_rad_body_val)
     time_arr[0] = 0.0
     t_upper_arr[0] = t_upper
     t_lower_arr[0] = t_lower
@@ -873,7 +1000,8 @@ def solve_transient(
 
         # Record snapshot
         if record_idx < n_records and current_time >= next_record_time - 1e-9:
-            props_snap = _humid_air_properties(t_upper, humidity_ratio)
+            q_rad_body_val = _q_rad_body(power_w, f_conv, f_body, heater_w, heater_h, t_wall_inner)
+            props_snap = _humid_air_properties(t_upper, humidity_ratio, q_rad_body_val)
             time_arr[record_idx] = current_time
             t_upper_arr[record_idx] = t_upper
             t_lower_arr[record_idx] = t_lower
@@ -884,6 +1012,7 @@ def solve_transient(
             record_idx += 1
             next_record_time += record_interval
 
+    q_rad_body_val = _q_rad_body(power_w, f_conv, f_body, heater_w, heater_h, t_wall_inner)
     if record_idx == 0 or abs(time_arr[record_idx - 1] - end_time) > 1e-9:
         if record_idx >= len(time_arr):
             time_arr = np.append(time_arr, end_time)
@@ -893,11 +1022,11 @@ def solve_transient(
             humidity_arr = np.append(humidity_arr, humidity_ratio)
             wall_temp_arr = np.append(wall_temp_arr, t_wall_inner)
             perceived_upper_arr = np.append(
-                perceived_upper_arr, _humid_air_properties(t_upper, humidity_ratio)["perceived_temp_c"]
+                perceived_upper_arr, _humid_air_properties(t_upper, humidity_ratio, q_rad_body_val)["perceived_temp_c"]
             )
             record_idx += 1
         else:
-            props_final = _humid_air_properties(t_upper, humidity_ratio)
+            props_final = _humid_air_properties(t_upper, humidity_ratio, q_rad_body_val)
             time_arr[record_idx] = end_time
             t_upper_arr[record_idx] = t_upper
             t_lower_arr[record_idx] = t_lower
@@ -938,6 +1067,7 @@ def solve_transient(
         beta_aug_applied=beta_aug_applied,
         t_wall_inner=t_wall_inner,
         humidity_ratio=humidity_ratio,
+        q_rad_body=q_rad_body_val,
     )
 
     return TransientResult(

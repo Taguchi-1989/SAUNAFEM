@@ -968,7 +968,7 @@ K-04 & ピーク到達時間 & 時系列 $T_{\text{upper}}(t)$ + イベント時
 \hline
 K-05 & 顔面風速ピーク (proxy) & $\beta_{\text{aug}}$ から推定 & \textbf{済} (ROM proxy) \\
 \hline
-K-06 & 簡易熱ストレス指標 & 体感温度 (乾球+湿度補正) & \textbf{済} \\
+K-06 & 簡易熱ストレス指標 & 体感温度 (皮膚熱収支モデル+放射) & \textbf{済} \\
 \hline
 K-07 & 上下相対温度差 & プローブ定常値 & \textbf{済} (\texttt{kpi.py}) \\
 \hline
@@ -1011,13 +1011,57 @@ $
 
 ここで $y_v = w / (1+w)$ は蒸気質量分率。
 
-\subsubsection{体感温度 (Steadman 近似)}
+\subsubsection{体感温度 (皮膚熱収支モデル)}
+
+従来の Steadman (1979) 近似は屋外条件 ($20$--$50$\textdegree C) のみ有効であり、
+サウナ温度域 ($60$--$120$\textdegree C) では適用外となる。
+本モデルでは皮膚表面の熱収支を直接評価し、等価温度 $T_{\text{eq}}$ を算出する。
+
+\paragraph{対流熱流束}
+$
+q_{\text{conv}} = h_{\text{conv}} \, (T_{\text{air}} - T_{\text{skin}})
+$
+
+ここで $T_{\text{skin}} = 36$\textdegree C (平均皮膚温度)、
+$h_{\text{conv}} = 8 \; \text{W/(m}^2\text{K)}$ (自然対流熱伝達率)。
+
+\paragraph{蒸発 / 凝縮項}
+Lewis 関係を用い蒸発冷却 (または高湿時の凝縮加熱) を算出する。
+
+$p_{\text{vapor}} > p_{\text{sat,skin}}$ (凝縮) のとき:
+$
+q_{\text{evap}} = \frac{16.5 \, h_{\text{conv}} \, (p_{\text{vapor}} - p_{\text{sat,skin}})}{1000}
+$
+
+$p_{\text{vapor}} \leq p_{\text{sat,skin}}$ (蒸発冷却) のとき:
+$
+q_{\text{evap}} = -\frac{16.5 \, h_{\text{conv}} \, (p_{\text{sat,skin}} - p_{\text{vapor}})}{1000}
+$
+
+ここで $p_{\text{sat}}$ は Magnus 式から算出 ($p_{\text{sat}} = 610.78 \exp(17.27 T / (T + 237.3))$ [Pa])。
+
+\paragraph{ヒーターからの直接放射}
+ヒーター表面温度を放射出力と面積から推定し、ヒーター--人体間の形態係数 $F_{\text{body}}$
+を用いて人体への放射熱流束を算出する。
 
 $
-T_{\text{perceived}} \approx T_{\text{dry}} + 0.33 \left(\frac{RH \cdot p_{\text{sat}}}{1000}\right) - 4.0 \quad (T > 27°\text{C}, \; RH > 5\%)
+q_{\text{rad,body}} = \varepsilon_{\text{body}} \, \sigma \, F_{\text{body}} \, (T_{\text{heater}}^4 - T_{\text{skin}}^4)
 $
 
-$p_{\text{sat}}$ は Antoine 式から算出。湿度が高いほど蒸発冷却が阻害され、体感温度が上昇する。
+ここで $\varepsilon_{\text{body}} = 0.97$、$\sigma = 5.67 \times 10^{-8} \; \text{W/(m}^2\text{K}^4\text{)}$。
+
+形態係数 $F_{\text{body}}$ はヒーター中心から上段ベンチ上の人体までの距離を用い、
+小面積近似 ($F \approx A_{\text{body}} / (2\pi d^2)$) で算出する。
+
+\paragraph{等価温度}
+全熱流束の合計を基準熱伝達率 $h_{\text{ref}} = 10 \; \text{W/(m}^2\text{K)}$ で正規化する。
+
+$
+T_{\text{eq}} = T_{\text{skin}} + \frac{q_{\text{conv}} + q_{\text{rad,body}} + q_{\text{evap}}}{h_{\text{ref}}}
+$
+
+この等価温度は K-06 (簡易熱ストレス指標) に直接使用される。
+$60$--$120$\textdegree C の範囲で物理的に妥当な値を返す。
 
 \subsubsection{ヒーター容量の目安}
 

@@ -10,7 +10,9 @@ from harness.simple_solver import (
     TransientResult,
     _compute_view_factors,
     _evaporation_rate,
+    _perceived_temperature,
     _plume_entrainment,
+    _q_rad_body,
     solve_transient,
     solve_two_zone,
 )
@@ -275,6 +277,7 @@ class TestViewFactors:
         """All view factors positive and sum approximately 1.0."""
         vf = _compute_view_factors(3.0, 2.5, 2.5, 0.1, 0.5, 0.6)
         assert all(v > 0 for v in vf.values())
+        assert "body" in vf
         total = sum(vf.values())
         assert 0.8 <= total <= 1.2  # approximately 1.0
 
@@ -296,6 +299,62 @@ class TestViewFactors:
         result = solve_two_zone(path, max_iter=10000)
         assert result.converged is True
         assert result.upper_layer_temp > result.lower_layer_temp
+
+
+class TestPerceivedTemperature:
+    def test_dry_hot_air_above_skin_temp(self) -> None:
+        """At 80C dry air, perceived temp should exceed skin temperature."""
+        t_eq = _perceived_temperature(80.0, 0.0)
+        assert t_eq > 36.0
+
+    def test_increases_with_humidity(self) -> None:
+        """Higher humidity at same temperature should raise perceived temp."""
+        t_dry = _perceived_temperature(80.0, 0.1)
+        t_humid = _perceived_temperature(80.0, 0.6)
+        assert t_humid > t_dry
+
+    def test_sauna_range_reasonable(self) -> None:
+        """At 80C / 20% RH (typical dry sauna), perceived temp in a sensible range."""
+        t_eq = _perceived_temperature(80.0, 0.2)
+        # Should be above air temp (convective + evap suppression heating)
+        # but not absurdly high
+        assert 40.0 < t_eq < 200.0
+
+    def test_increases_with_radiation(self) -> None:
+        """Direct radiation should raise perceived temperature."""
+        t_no_rad = _perceived_temperature(80.0, 0.2, q_rad_body=0.0)
+        t_with_rad = _perceived_temperature(80.0, 0.2, q_rad_body=200.0)
+        assert t_with_rad > t_no_rad
+
+    def test_below_skin_temp_feels_cool(self) -> None:
+        """At 20C dry air, perceived temp should be below skin temperature."""
+        t_eq = _perceived_temperature(20.0, 0.3)
+        assert t_eq < 36.0
+
+    def test_condensation_at_extreme_humidity(self) -> None:
+        """At 100C / 100% RH, condensation should raise perceived temp significantly."""
+        t_low_rh = _perceived_temperature(100.0, 0.1)
+        t_high_rh = _perceived_temperature(100.0, 1.0)
+        assert t_high_rh > t_low_rh
+
+
+class TestQRadBody:
+    def test_positive_flux(self) -> None:
+        """Radiative flux from a hot heater to body should be positive."""
+        q = _q_rad_body(9000.0, 0.7, 0.03, 0.6, 0.5, 350.0)
+        assert q > 0.0
+
+    def test_increases_with_power(self) -> None:
+        """Higher heater power should give higher radiative flux."""
+        q_lo = _q_rad_body(5000.0, 0.7, 0.03, 0.6, 0.5, 350.0)
+        q_hi = _q_rad_body(15000.0, 0.7, 0.03, 0.6, 0.5, 350.0)
+        assert q_hi > q_lo
+
+    def test_increases_with_view_factor(self) -> None:
+        """Larger view factor means more radiation reaches the body."""
+        q_lo = _q_rad_body(9000.0, 0.7, 0.01, 0.6, 0.5, 350.0)
+        q_hi = _q_rad_body(9000.0, 0.7, 0.08, 0.6, 0.5, 350.0)
+        assert q_hi > q_lo
 
 
 class TestBetaAug:
