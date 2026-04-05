@@ -651,6 +651,7 @@ def solve_two_zone(
     t_lower = t_wall
     z_int = height * 0.95
     humidity_ratio = 0.0  # kg vapor / kg dry air
+    steam_remaining = 0.0  # kg of steam still in the room
 
     # Total wall area for lumped wall model
     a_wall_total = 2 * (width * height + depth * height) + 2 * a_floor
@@ -724,22 +725,24 @@ def solve_two_zone(
 
         # Steam (löyly) — steady-state treatment
         # Latent heat is drawn FROM the heater/stones, not created.
-        # Humidity is set ONCE when steam is first applied, then evolves
-        # via ventilation dilution. This avoids resetting each iteration
-        # which would defeat ventilation's dehumidification effect.
+        # Humidity is a state variable: water_kg of steam is distributed
+        # in the current upper layer mass, so humidity_ratio tracks m_upper
+        # as it evolves. Ventilation removes moisture, reducing the
+        # effective steam remaining in the room.
         if water_kg > 0:
             if not steam_applied:
-                humidity_ratio = water_kg / max(m_upper, 0.1)
+                steam_remaining = water_kg
                 total_steam = water_kg
                 peak_steam_rate = water_kg / tau_evap
                 steam_applied = True
+            # Ventilation removes humid air → reduces steam remaining in room
+            if vent_enabled and m_vent > 0 and m_upper > 0.1 and steam_remaining > 0:
+                dm_steam_out = m_vent * humidity_ratio / (1.0 + humidity_ratio) * dt
+                steam_remaining = max(steam_remaining - dm_steam_out, 0.0)
+            # Humidity ratio from current steam mass in current upper layer
+            humidity_ratio = steam_remaining / max(m_upper, 0.1)
             v_steam = 0.0
             m_dot_steam = 0.0
-            # Ventilation humidity dilution (exhaust removes humid air, supply brings dry)
-            if vent_enabled and m_vent > 0 and m_upper > 0.1:
-                dw = m_vent * (w_ambient_vent - humidity_ratio) / m_upper
-                humidity_ratio += dt * dw
-                humidity_ratio = max(humidity_ratio, 0.0)
         else:
             m_dot_steam = 0.0
             v_steam = 0.0
