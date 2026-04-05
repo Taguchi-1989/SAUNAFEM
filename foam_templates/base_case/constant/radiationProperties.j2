@@ -1,0 +1,36 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      radiationProperties;
+}
+
+{% if radiation_model | default("none") != "none" %}
+radiation       on;
+radiationModel  {{ radiation_model | default("viewFactor") }};
+
+{% if radiation_model | default("viewFactor") == "fvDOM" %}
+fvDOMCoeffs
+{
+    nPhi        2;
+    nTheta      2;
+    maxIter     10;
+    tolerance   1e-3;
+}
+{% endif %}
+
+absorptionEmissionModel greyMeanAbsorptionEmission;
+
+greyMeanAbsorptionEmissionCoeffs
+{
+    lookUpTableFileName "none";
+    EhrrCoeff   0.0;
+}
+
+scatterModel    none;
+sootModel       none;
+{% else %}
+radiation       off;
+radiationModel  none;
+{% endif %}

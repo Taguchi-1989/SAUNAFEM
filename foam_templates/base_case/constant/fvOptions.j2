@@ -34,6 +34,9 @@ buoyancyProduction
             // G_b = -(mu_t / (rho * Pr_t)) * (g & grad(rho))
             // Stable stratification (hot above cold) -> suppresses turbulence
             // Unstable stratification (cold above hot) -> enhances turbulence
+            // NOTE: fvc::grad(rho) is valid for multiComponentMixture too,
+            // because rho already accounts for composition (Y_i) effects
+            // via the equation of state in thermophysicalProperties.
             const volScalarField& rho =
                 mesh_.lookupObject<volScalarField>("rho");
             const volScalarField& mut =

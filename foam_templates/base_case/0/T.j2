@@ -12,6 +12,9 @@ internalField   uniform {{ T_initial }};
 
 boundaryField
 {
+{% if radiation_model | default("none") != "none" %}
+    // Radiation fields handled by radiation model
+{% endif %}
     floor
     {
         type            fixedValue;

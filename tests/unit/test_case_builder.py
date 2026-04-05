@@ -397,3 +397,199 @@ class TestAufgussTemplate:
         build_case(sample_case_path, output_dir=out)
         fvoptions = (out / "constant" / "fvOptions").read_text(encoding="utf-8")
         assert "aufgussJet" not in fvoptions
+
+
+class TestRadiationTemplate:
+    """Tests for radiation model templates."""
+
+    _TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "foam_templates" / "base_case"
+
+    def _minimal_context(self, radiation_model: str = "none") -> dict:
+        """Build a minimal context dict for template rendering."""
+        return {
+            "dim_x": 3.0,
+            "dim_y": 2.5,
+            "dim_z": 2.5,
+            "nx": 24,
+            "ny": 20,
+            "nz": 20,
+            "heater_area": 0.3,
+            "heater_y0": 0.1,
+            "heater_y1": 0.6,
+            "heater_z0": 0.95,
+            "heater_z1": 1.55,
+            "vertices": [(0, 0, 0), (3, 0, 0), (3, 2.5, 0), (0, 2.5, 0),
+                         (0, 0, 2.5), (3, 0, 2.5), (3, 2.5, 2.5), (0, 2.5, 2.5)],
+            "blocks": [{"vertices": (0, 1, 2, 3, 4, 5, 6, 7), "cells": (24, 20, 20)}],
+            "floor_faces": [(0, 1, 5, 4)],
+            "ceiling_faces": [(3, 7, 6, 2)],
+            "heater_faces": [(0, 4, 7, 3)],
+            "heater_surround_faces": [],
+            "opposite_faces": [(1, 2, 6, 5)],
+            "front_faces": [(0, 3, 2, 1)],
+            "back_faces": [(4, 5, 6, 7)],
+            "heat_flux": 30000.0,
+            "heater_width": 0.6,
+            "heater_height": 0.5,
+            "T_walls": 293.15,
+            "T_initial": 293.15,
+            "solver_name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+            "probes": [],
+            "mixture_type": "pure",
+            "Y_H2O_initial": 0.01,
+            "Y_H2O_heater": 0.01,
+            "aufguss_enabled": False,
+            "aufguss_jet_velocity": 0.0,
+            "aufguss_duration": 1.0,
+            "buoyancy_production": True,
+            "species_transport": False,
+            "radiation_model": radiation_model,
+        }
+
+    def test_radiation_disabled_by_default(self, tmp_path: Path) -> None:
+        """Default radiation_model='none' produces radiation off."""
+        ctx = self._minimal_context("none")
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        rad = (tmp_path / "constant" / "radiationProperties").read_text(encoding="utf-8")
+        assert "radiation       off" in rad
+        assert "radiationModel  none" in rad
+
+    def test_radiation_enabled_renders_properties(self, tmp_path: Path) -> None:
+        """When radiation_model is set, radiationProperties enables radiation."""
+        ctx = self._minimal_context("viewFactor")
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        rad = (tmp_path / "constant" / "radiationProperties").read_text(encoding="utf-8")
+        assert "radiation       on" in rad
+        assert "radiationModel  viewFactor" in rad
+        assert "greyMeanAbsorptionEmission" in rad
+
+    def test_fvdom_renders_coeffs(self, tmp_path: Path) -> None:
+        """fvDOM radiation model renders fvDOMCoeffs block."""
+        ctx = self._minimal_context("fvDOM")
+        render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2"])
+        rad = (tmp_path / "constant" / "radiationProperties").read_text(encoding="utf-8")
+        assert "fvDOMCoeffs" in rad
+        assert "nPhi" in rad
+        # IDefault should be rendered for fvDOM
+        assert (tmp_path / "0" / "IDefault").is_file()
+
+    def test_idefault_not_rendered_without_fvdom(self, tmp_path: Path) -> None:
+        """IDefault field should not be created when radiation is off or viewFactor."""
+        ctx = self._minimal_context("none")
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        assert not (tmp_path / "0" / "IDefault").exists()
+
+    def test_radiation_comment_in_t_when_enabled(self, tmp_path: Path) -> None:
+        """T boundary field includes radiation comment when radiation is on."""
+        ctx = self._minimal_context("viewFactor")
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        t_file = (tmp_path / "0" / "T").read_text(encoding="utf-8")
+        assert "Radiation fields handled by radiation model" in t_file
+
+    def test_no_radiation_comment_when_disabled(self, tmp_path: Path) -> None:
+        """T boundary field has no radiation comment when radiation is off."""
+        ctx = self._minimal_context("none")
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        t_file = (tmp_path / "0" / "T").read_text(encoding="utf-8")
+        assert "Radiation fields handled by radiation model" not in t_file
+
+    def test_build_case_radiation_disabled_by_default(
+        self, sample_case_path: Path, tmp_path: Path,
+    ) -> None:
+        """Full build_case with no radiation key produces radiation off."""
+        out = tmp_path / "test_case"
+        build_case(sample_case_path, output_dir=out)
+        rad = (out / "constant" / "radiationProperties").read_text(encoding="utf-8")
+        assert "radiation       off" in rad
+        assert not (out / "0" / "IDefault").exists()
+
+
+class TestSpeciesTransportScheme:
+    """Tests for species transport div scheme in fvSchemes."""
+
+    _TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "foam_templates" / "base_case"
+
+    def _minimal_context(self, species_transport: bool = False) -> dict:
+        """Build a minimal context dict for template rendering."""
+        return {
+            "dim_x": 3.0,
+            "dim_y": 2.5,
+            "dim_z": 2.5,
+            "nx": 24,
+            "ny": 20,
+            "nz": 20,
+            "heater_area": 0.3,
+            "heater_y0": 0.1,
+            "heater_y1": 0.6,
+            "heater_z0": 0.95,
+            "heater_z1": 1.55,
+            "vertices": [(0, 0, 0), (3, 0, 0), (3, 2.5, 0), (0, 2.5, 0),
+                         (0, 0, 2.5), (3, 0, 2.5), (3, 2.5, 2.5), (0, 2.5, 2.5)],
+            "blocks": [{"vertices": (0, 1, 2, 3, 4, 5, 6, 7), "cells": (24, 20, 20)}],
+            "floor_faces": [(0, 1, 5, 4)],
+            "ceiling_faces": [(3, 7, 6, 2)],
+            "heater_faces": [(0, 4, 7, 3)],
+            "heater_surround_faces": [],
+            "opposite_faces": [(1, 2, 6, 5)],
+            "front_faces": [(0, 3, 2, 1)],
+            "back_faces": [(4, 5, 6, 7)],
+            "heat_flux": 30000.0,
+            "heater_width": 0.6,
+            "heater_height": 0.5,
+            "T_walls": 293.15,
+            "T_initial": 293.15,
+            "solver_name": "buoyantPimpleFoam",
+            "end_time": 300,
+            "write_interval": 10,
+            "delta_t": 0.05,
+            "averaging_start": 150,
+            "probes": [],
+            "mixture_type": "pure",
+            "Y_H2O_initial": 0.01,
+            "Y_H2O_heater": 0.01,
+            "aufguss_enabled": False,
+            "aufguss_jet_velocity": 0.0,
+            "aufguss_duration": 1.0,
+            "buoyancy_production": True,
+            "species_transport": species_transport,
+            "radiation_model": "none",
+        }
+
+    def test_species_transport_scheme_added(self, tmp_path: Path) -> None:
+        """Species transport div scheme appears when enabled."""
+        ctx = self._minimal_context(species_transport=True)
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        schemes = (tmp_path / "system" / "fvSchemes").read_text(encoding="utf-8")
+        assert "div(phi,Yi_h)" in schemes
+
+    def test_species_transport_scheme_absent_by_default(self, tmp_path: Path) -> None:
+        """Species transport div scheme absent when disabled."""
+        ctx = self._minimal_context(species_transport=False)
+        render_templates(
+            self._TEMPLATE_DIR, tmp_path, ctx,
+            skip_templates=["0/H2O.j2", "0/IDefault.j2"],
+        )
+        schemes = (tmp_path / "system" / "fvSchemes").read_text(encoding="utf-8")
+        assert "div(phi,Yi_h)" not in schemes

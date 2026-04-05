@@ -358,6 +358,13 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     turbulence = data.get("turbulence", {})
     buoyancy_production = turbulence.get("buoyancy_production", True)
 
+    # Species transport (needed for multiComponentMixture)
+    species_transport = mixture_type == "multiComponent"
+
+    # Radiation model: "none", "viewFactor", or "fvDOM"
+    radiation_cfg = data.get("radiation", {})
+    radiation_model = radiation_cfg.get("model", "none") if radiation_cfg else "none"
+
     context = {
         **mesh,
         **heater,
@@ -374,12 +381,18 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "aufguss_jet_velocity": aufguss.get("jet_velocity", 2.0) if aufguss_enabled else 0.0,
         "aufguss_duration": aufguss.get("duration", 1.0) if aufguss_enabled else 1.0,
         "buoyancy_production": buoyancy_production,
+        "species_transport": species_transport,
+        "radiation_model": radiation_model,
     }
 
     # Skip vapor field template for pure mixture cases
     skip: list[str] = []
     if mixture_type != "multiComponent":
         skip.append("0/H2O.j2")
+
+    # Skip IDefault template when not using fvDOM radiation
+    if radiation_model != "fvDOM":
+        skip.append("0/IDefault.j2")
 
     render_templates(_TEMPLATE_DIR, output_dir, context, skip_templates=skip)
     return output_dir
