@@ -108,6 +108,22 @@ experiments/
 - `experiments/` - Experimental measurement data
 - `results/` - Generated results per case
 - `docs/` - Documentation
+- `docs/openfoam_troubleshooting.md` - OpenFOAM エラー記録と修正チェックリスト
+- `scripts/run_openfoam_wsl.sh` - WSL2 での OpenFOAM 実行スクリプト
+- `scripts/run_and_plot.py` - 簡易版3シナリオ比較プロット
+- `scripts/plot_openfoam_results.py` - OpenFOAM vs 簡易版比較プロット
+
+### OpenFOAM 実行 (WSL2)
+
+```bash
+# ケースビルド → WSL 実行
+PYTHONPATH=src python -c "from harness.case_builder import build_case; from pathlib import Path; build_case(Path('configs/cases/dry_sauna_steady.yaml'), output_dir=Path('results/openfoam_dry'))"
+wsl -d Ubuntu -- /usr/bin/openfoam2312 bash /mnt/d/dev/SaunaFEM/scripts/run_openfoam_wsl.sh
+```
+
+- 必ず `FOAM_SIGFPE=false` で実行（開発中）
+- 初期 deltaT=0.001, maxCo=0.3 で安定化
+- 詳細は `docs/openfoam_troubleshooting.md` 参照
 
 ## Phase Plan
 1. **Phase 0**: Project foundation — repo, directory structure, YAML schema, CLI skeleton
