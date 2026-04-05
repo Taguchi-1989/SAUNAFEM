@@ -15,6 +15,9 @@
 6. [数値解法と収束制御](#6-数値解法と収束制御)
 7. [物性値](#7-物性値)
 8. [簡易版と正確版の対応関係](#8-簡易版と正確版の対応関係)
+9. [既知の物理的制約とフェーズ拡張計画](#9-既知の物理的制約とフェーズ拡張計画)
+10. [換気モデル](#10-換気モデル-natural-ventilation)
+11. [既知の物理的制約](#11-既知の物理的制約)
 
 ---
 
@@ -103,8 +106,19 @@ $$
 \frac{\partial (\rho k)}{\partial t}
 + \nabla \cdot (\rho \mathbf{U} k)
 = \nabla \cdot \left[ (\mu + \sigma_k \mu_t) \nabla k \right]
-+ P_k - \beta^* \rho k \omega
++ P_k + G_b - \beta^* \rho k \omega
 $$
+
+ここで $G_b$ は浮力生成項:
+
+$$
+G_b = -\frac{\mu_t}{\rho \, Pr_t} \left( \mathbf{g} \cdot \nabla \rho \right)
+$$
+
+- $Pr_t = 0.85$ (乱流プラントル数)
+- 安定成層 (上部高温・下部低温): $G_b < 0$ → 乱流を抑制し、温度層の鮮明化に寄与
+- 不安定成層 (ヒーター近傍): $G_b > 0$ → 乱流を促進し、対流混合を強化
+- 実装: fvOptions の codedSource により k 方程式に注入
 
 **比散逸率 omega:**
 
@@ -210,14 +224,28 @@ Zukoski のプルーム相関式に基づく。
 ヒーター中心から高さ $z$ の位置におけるプルーム質量流量:
 
 $$
-\dot{m}_p(z) = 0.071 \, Q_c^{1/3} \, z^{5/3} + 0.0018 \, Q_c
+\dot{m}_p(z_{\text{eff}}) = 0.071 \, Q_c^{1/3} \, z_{\text{eff}}^{5/3} + 0.0018 \, Q_c
 $$
 
-ここで:
+ここで $z_{\text{eff}}$ は Heskestad の仮想原点補正を適用した有効高さ:
 
+$$
+z_0 = -1.02 \, D + 0.083 \, Q_c^{2/5}
+$$
+
+$$
+z_{\text{eff}} = \max(0.01, \; z - z_0)
+$$
+
+- $D$: ヒーター特性直径 [m] (YAML の `heater.width`)
+- $z_0$: 仮想原点オフセット [m] (小型ヒーターでは通常負 → $z_{\text{eff}} > z$)
 - $Q_c$: 対流熱出力 [kW] ($Q_c = f_{\text{conv}} \times Q_{\text{heater}}$, $f_{\text{conv}} = 0.7$)
 - $z$: ヒーター中心からの鉛直距離 [m]
 - $\dot{m}_p$: プルーム質量流量 [kg/s]
+
+Zukoski 相関は点源に対して導出されたため、有限径 $D$ のヒーターには
+Heskestad (1984) の仮想原点補正が必要。これにより、実効プルーム高さが
+幾何学的高さより大きくなり、エントレインメント量が適切に増加する。
 
 プルーム温度（エネルギー保存から）:
 
@@ -311,7 +339,7 @@ $$
 
 $$
 A_{\text{floor}} \, \frac{dz_{\text{int}}}{dt}
-= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}}
+= -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}} + \dot{V}_{\text{mix}} + \dot{V}_{\text{vent}}
 $$
 
 ここで:
@@ -319,9 +347,27 @@ $$
 - $\dot{m}_p / \rho_{\text{upper}}$: プルームが上層に供給する体積流量（界面を押し下げる）
 - $\dot{V}_{\text{return}}$: 壁面沿い下降流による体積流量（界面を押し上げる）
 - $\dot{V}_{\text{steam}}$: 蒸気体積膨張（ロウリュ時のみ、過渡ソルバーで使用）
+- $\dot{V}_{\text{mix}}$: アウフグース双方向質量交換による正味体積効果
+- $\dot{V}_{\text{vent}}$: 換気による下層への体積供給（界面を押し上げる）
 
 $$
 \dot{V}_{\text{return}} = \frac{h_{\text{wall}} \, A_{\text{wall,upper}} \, (T_{\text{upper}} - T_{\text{wall,inner}})}{\rho_{\text{upper}} \, c_p \, \max(T_{\text{upper}} - T_{\text{lower}}, \, 1)}
+$$
+
+アウフグース質量交換項: $\beta_{\text{aug}}$ [kg/s] の双方向混合では、
+密度差により等質量の体積が異なるため、正味の体積変化が生じる:
+
+$$
+\dot{V}_{\text{mix}} = \beta_{\text{aug}} \left( \frac{1}{\rho_{\text{lower}}} - \frac{1}{\rho_{\text{upper}}} \right)
+$$
+
+$\rho_{\text{upper}} < \rho_{\text{lower}}$（高温空気は低密度）のとき $\dot{V}_{\text{mix}} < 0$ となり、
+界面が下降する。これはタオルが高温空気を強制的に下方へ押す効果を表す。
+
+換気項: 給気は下層に体積を追加し、界面を上方に押し上げる:
+
+$$
+\dot{V}_{\text{vent}} = \frac{\dot{m}_{\text{vent}}}{\rho_{\text{lower}}}
 $$
 
 定常状態ではこれらがバランスし、界面高さが安定する。
@@ -394,6 +440,7 @@ $$
 - Morton, Taylor & Turner (1956), "Turbulent Gravitational Convection from Maintained and Instantaneous Sources", Proc. R. Soc. A 234:1-23
 - Zukoski (1978), "Development of a Stratified Ceiling Layer in the Early Stages of a Closed-Room Fire", NBS-GCR-78-150
 - Cooper (1982), "A Mathematical Model for Estimating Available Safe Egress Time in Fires", NBSIR 82-2612
+- Heskestad (1984), "Engineering Relations for Fire Plumes", Fire Safety Journal 7(1):25-32
 
 ---
 
@@ -799,79 +846,123 @@ PoC フェーズに適している。
 
 ---
 
-## 10. 既知の物理的制約（未解決）
+## 10. 換気モデル (Natural Ventilation)
 
-本プロジェクトの現行モデルに存在する物理的制約のうち、
-認識済みだが未修正のものを以下に列挙する。
-これらは今後のフェーズで段階的に対処する予定。
+### 10.1 モデル概要
 
-### 10.1 換気モデルの欠落
+実サウナには給気口（床付近・ヒーター近傍）と排気口（天井付近）があり、
+室内外温度差による煙突効果（stack effect）で自然換気が発生する。
+従来の密閉箱仮定（sealed-box assumption）を除去し、
+任意の給排気構成をサポートする。
 
-**現状:** サウナ室を完全密閉空間として扱っている。
+`model: "none"` (デフォルト) で従来の密閉モデル、
+`model: "natural"` で自然換気モデルを選択。
 
-**物理的問題:** 実際のサウナには給排気口が存在し、ロウリュ時の体積膨張は主に
-排気口から外部へ放出される。密閉仮定では界面低下を過大評価する。
-また、定常時の新鮮空気導入は下層温度と湿度に決定的な影響を与える。
+### 10.2 煙突効果による駆動圧力
 
-**今後の方針:** オリフィス流量式
-$\dot{m}_{\text{vent}} = C_d A \sqrt{2 \rho \Delta p}$
-に基づく換気モデルを質量・エネルギー保存式に組み込む。
-サウナの給排気口サイズ（通常 $A \sim 0.01\text{--}0.04$ m²）と
-位置（吸気口: 低位、排気口: 高位）をYAMLパラメータ化する。
+$$
+\Delta p = \rho_{\text{amb}} \, g \, (z_{\text{exhaust}} - z_{\text{supply}}) \,
+\frac{T_{\text{exhaust}} - T_{\text{ambient}}}{T_{\text{ambient}}}
+$$
 
-### 10.2 Aufguss ROM の質量保存との不整合
+- $\rho_{\text{amb}}$: 外気密度 [kg/m³]
+- $T_{\text{exhaust}}$: 排気口位置のゾーン温度（界面位置に応じて $T_{\text{upper}}$ または $T_{\text{lower}}$）
+- $T_{\text{ambient}}$: 外気温 [K]
 
-**現状:** $\beta_{\text{aug}}$ によるエネルギー交換のみをモデル化。
+### 10.3 オリフィス流量モデル
 
-**物理的問題:** 対流による熱輸送は必ず質量の移動を伴う。
-上層から下層へ空気が移動すれば、下層から上層へも同質量が押し出される。
-エネルギー保存式だけに混合項を入れて質量保存式（界面方程式）に
-反映しないと、ゾーンの質量とエンタルピーの整合性が破綻する。
+$$
+\dot{m}_{\text{vent}} = C_d A_{\text{eff}} \sqrt{2 \rho_{\text{supply}} |\Delta p|}
+$$
 
-**今後の方針:** 界面質量保存式にも $\dot{m}_{\text{mix}}$ に基づく
-双方向質量交換項を追加する。
+- $C_d A_{\text{eff}} = \min(C_{d,s} A_s, \, C_{d,e} A_e)$: 有効開口面積（流量は狭い方で制限）
+- $\dot{m}_{\text{vent}} \ge 0$: 自然換気では正（流入）方向のみ
 
-### 10.3 Zukoski プルームモデルの仮想原点未補正
+### 10.4 エネルギー保存への寄与
 
-**現状:** ヒーター中心位置を直接 $z=0$ として Zukoski 相関式に入力。
+**下層（給気側）:** $Q_{\text{vent,lower}} = \dot{m}_{\text{vent}} \, c_p \, (T_{\text{ambient}} - T_{\text{lower}})$
 
-**物理的問題:** Zukoski の式は「点熱源」を仮定している。
-有限サイズのサウナストーブでは、物理的なヒーター位置と
-プルーム計算上の仮想原点 $z_0$ にずれが生じる。
-火災（数百～千℃）とサウナ（数十～数百℃）では密度差のスケールも異なり、
-Boussinesq 近似の妥当性限界を超える可能性がある。
+**上層（排気側）:** $Q_{\text{vent,upper}} = \dot{m}_{\text{vent}} \, c_p \, (T_{\text{lower}} - T_{\text{upper}})$
 
-**今後の方針:** Heskestad (1984) の仮想原点補正
-$z_0 = -1.02 D + 0.083 Q^{2/5}$ を導入し、
-$z$ → $z - z_0$ に置き換える。
+### 10.5 湿度への寄与（過渡計算時）
 
-### 10.4 体感温度モデル (皮膚熱収支モデルに置換済)
+外気は低湿度（$w_{\text{ambient}}$）であり、ロウリュ後の湿度減衰メカニズムとなる:
 
-**旧実装:** K-06 に Steadman の heat index 近似式を使用していたが、
-気温 20-50℃ 程度の屋外条件のみ有効であり、サウナ温度域 (60-120℃) では適用外だった。
+$$
+\frac{dw}{dt} = \frac{\dot{m}_{\text{vent}}}{m_{\text{upper}}} (w_{\text{ambient}} - w)
+$$
 
-**現在の実装:** 皮膚表面の熱収支を直接評価する等価温度モデルに置換済。
+---
+
+## 11. 既知の物理的制約
+
+本プロジェクトの現行モデルに存在していた物理的制約と、その解決状況を記録する。
+項目 11.1--11.5 は全て解決済。11.6 は設計上の判断事項。
+
+### 11.1 換気モデル 【解決済】
+
+**旧問題:** サウナ室を完全密閉空間として扱っていた。
+
+**実装内容:** 煙突効果（stack effect）に基づく自然換気モデルを実装。
+オリフィス流量式 $\dot{m}_{\text{vent}} = C_d A_{\text{eff}} \sqrt{2 \rho |\Delta p|}$ により
+質量・エネルギー・界面高さ・湿度の全方程式に寄与。
+給排気口のサイズ・位置・流量係数を YAML でパラメータ化済。
+詳細は §10 換気モデルを参照。
+
+### 11.2 Aufguss ROM の質量保存 【解決済】
+
+**旧問題:** $\beta_{\text{aug}}$ によるエネルギー交換のみで、界面方程式への反映が欠落。
+
+**実装内容:** 界面質量保存式に双方向質量交換の正味体積効果を追加:
+
+$$
+\dot{V}_{\text{mix}} = \beta_{\text{aug}} \left( \frac{1}{\rho_{\text{lower}}} - \frac{1}{\rho_{\text{upper}}} \right)
+$$
+
+エネルギー保存と質量保存の整合性が確保された（§3.3 参照）。
+
+### 11.3 Zukoski プルームモデルの仮想原点 【解決済】
+
+**旧問題:** 有限サイズのヒーターに対して点熱源の Zukoski 相関を直接適用していた。
+
+**実装内容:** Heskestad (1984) の仮想原点補正を導入:
+
+$$
+z_0 = -1.02 \, D + 0.083 \, Q_c^{2/5}, \quad z_{\text{eff}} = \max(0.01, \; z - z_0)
+$$
+
+§3.2 の Zukoski 相関式に反映済。
+
+### 11.4 体感温度モデル 【解決済】
+
+**旧問題:** K-06 に Steadman の heat index 近似式（20-50℃ のみ有効）を使用。
+
+**実装内容:** 皮膚表面の熱収支を直接評価する等価温度モデルに置換:
 
 - 対流熱流束: $q_{\text{conv}} = h_{\text{conv}} (T_{\text{air}} - T_{\text{skin}})$
-- 蒸発/凝縮項: Lewis 関係により湿度の影響を評価
-- ヒーター直接放射: $q_{\text{rad,body}} = \varepsilon \sigma F_{\text{body}} (T_{\text{heater}}^4 - T_{\text{skin}}^4)$
+- 蒸発/凝縮項: Lewis 関係 + 皮膚濡れ率 $W = 0.4$ + 生理上限 400 W/m²
+- ヒーター直接放射: $q_{\text{rad,body}} = \varepsilon_{\text{body}} \sigma F_{\text{body}} (T_{\text{heater}}^4 - T_{\text{skin}}^4)$
 - 等価温度: $T_{\text{eq}} = T_{\text{skin}} + q_{\text{total}} / h_{\text{ref}}$
 
-60-120℃ の範囲で物理的に妥当な値を返す。
+60-120℃ の範囲で物理的に妥当な値を返す（付録C 参照）。
 
-### 10.5 SST k-omega の浮力生成項
+### 11.5 SST k-omega の浮力生成項 【解決済】
 
-**現状:** 標準の SST k-omega モデルを使用（`kOmegaSST`）。
+**旧問題:** 標準 SST k-omega に浮力生成項 $G_b$ が欠落。
 
-**物理的問題:** 標準の SST k-omega は浮力による乱流生成/消散の項
-（buoyancy production term $G_b = -\frac{\mu_t}{Pr_t \rho} \mathbf{g} \cdot \nabla\rho$）
-を含んでいない。安定成層（上層が高温）では浮力が乱流を抑制するが、
-この効果が無視されると温度成層の鋭さを過小予測する。
+**実装内容:** fvOptions の codedSource により k 方程式に浮力生成項を注入:
 
-**今後の方針:** OpenFOAM の乱流モデルに浮力項を追加するか、
-`buoyantKOmegaSST` 相当のモデルを採用する。
+$$
+G_b = -\frac{\mu_t}{\rho \, Pr_t} \left( \mathbf{g} \cdot \nabla \rho \right)
+$$
 
-### 10.6 輻射経路の設計判断
+- $Pr_t = 0.85$
+- 安定成層 ($G_b < 0$): 乱流抑制 → 温度層の鮮明化
+- 不安定成層 ($G_b > 0$): 乱流促進 → 対流混合強化
+
+§2.4 の k 方程式に反映済。
+
+### 11.6 輻射経路の設計判断
 
 **現状:** `wall_cfg == "lumped"` の場合、全輻射は壁面に吸収され、
 壁面から空気への対流伝熱で間接的に空気を加熱する。
@@ -891,9 +982,9 @@ K-06（熱ストレス）の計算に反映される。
 
 | フェーズ | OpenFOAM | 簡易版 | 状態 |
 |---------|----------|--------|------|
-| Phase 1 | buoyantPimpleFoam + SST k-omega, pureMixture | 2-Zone プルームモデル (定常) | **実装済** |
-| Phase 2 | multiComponentMixture + 蒸気輸送 ($Y$) + H2O テンプレート | 蒸気体積膨張 $\dot{V}_{\text{steam}}$ + 蒸発潜熱 $Q_{\text{steam}}$ + 形態係数輻射 + 壁面昇温モデル + 湿度連成物性 + 非定常ソルバー (`solve_transient`) | **実装済** |
-| Phase 3 | 運動量ソース項 (ジェット) — 未実装 | ROM: 強制混合係数 $\beta_{\text{aug}}$ + 抽出スクリプト (`extract_beta_aug.py`) | **枠組み実装済** |
+| Phase 1 | buoyantPimpleFoam + SST k-omega ($G_b$ 浮力生成項付), pureMixture | 2-Zone プルームモデル (定常) + Heskestad 仮想原点補正 | **実装済** |
+| Phase 2 | multiComponentMixture + 蒸気輸送 ($Y$) + H2O テンプレート | 蒸気体積膨張 $\dot{V}_{\text{steam}}$ + 形態係数輻射 + 壁面昇温モデル + 湿度連成物性 + 皮膚熱収支モデル + 自然換気モデル + 非定常ソルバー (`solve_transient`) | **実装済** |
+| Phase 3 | 運動量ソース項 (ジェット) — 未実装 | ROM: 強制混合係数 $\beta_{\text{aug}}$ + 質量保存整合 ($\dot{V}_{\text{mix}}$) + 抽出スクリプト (`extract_beta_aug.py`) | **枠組み実装済** |
 | Phase 4-5 | — | CSV 取込 (`validation.py`) + プローブ比較 (`compare_probes`) + レポート生成 (`reporting.py`) | **枠組み実装済** |
 
 ## 付録 B: KPI 一覧と実装状況
@@ -957,9 +1048,12 @@ $$
 
 ここで $T_{\text{skin}} = 36$℃、$h_{\text{conv}} = 8 \; \text{W/(m²K)}$。
 
-**蒸発 / 凝縮項 (Lewis 関係):**
+**蒸発 / 凝縮�� (Lewis 関係):**
 
-$p_{\text{vapor}} > p_{\text{sat,skin}}$ (凝縮) のとき:
+皮膚濡れ率 $W = 0.4$（サウナ環境の典型値）で蒸発能力を制限し、
+生理学的上限 $q_{\text{evap,max}} = 400$ W/m² を設ける。
+
+$p_{\text{vapor}} > p_{\text{sat,skin}}$ (凝縮) のとき（$W$ は不適用）:
 
 $$
 q_{\text{evap}} = \frac{16.5 \, h_{\text{conv}} (p_{\text{vapor}} - p_{\text{sat,skin}})}{1000}
@@ -968,17 +1062,32 @@ $$
 $p_{\text{vapor}} \leq p_{\text{sat,skin}}$ (蒸発冷却) のとき:
 
 $$
-q_{\text{evap}} = -\frac{16.5 \, h_{\text{conv}} (p_{\text{sat,skin}} - p_{\text{vapor}})}{1000}
+q_{\text{evap,raw}} = \frac{16.5 \, h_{\text{conv}} (p_{\text{sat,skin}} - p_{\text{vapor}})}{1000}
 $$
 
-**ヒーターからの直接放射:**
+$$
+q_{\text{evap}} = -\min(W \cdot q_{\text{evap,raw}}, \; q_{\text{evap,max}})
+$$
+
+**ヒータ��からの直接放射:**
+
+ヒーター表面温度の推定:
+
+$$
+T_{\text{heater}} = \left( \frac{q_{\text{heater,surface}}}{\varepsilon_{\text{heater}} \, \sigma} + T_{\text{wall,inner}}^4 \right)^{1/4}
+$$
+
+ここで $q_{\text{heater,surface}} = Q_{\text{rad}} / A_{\text{heater}}$ [W/m²]、
+$\varepsilon_{\text{heater}} = 0.90$（ストーブ/金属表面放射率）。
+
+人体への正味放射熱流束:
 
 $$
 q_{\text{rad,body}} = \varepsilon_{\text{body}} \sigma F_{\text{body}} (T_{\text{heater}}^4 - T_{\text{skin}}^4)
 $$
 
-ここで $\varepsilon_{\text{body}} = 0.97$、$F_{\text{body}}$ はヒーター--人体間の形態係数
-(小面積近似 $F \approx A_{\text{body}} / (2\pi d^2)$ で算出)。
+ここで $\varepsilon_{\text{body}} = 0.97$（人体皮膚放射率）、$F_{\text{body}}$ はヒーター--人体間の形態係数
+(��面積近似 $F \approx A_{\text{body}} / (2\pi d^2)$ で算出、[0.005, 0.10] にクリップ)。
 
 **等価温度:**
 

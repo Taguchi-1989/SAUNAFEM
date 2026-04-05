@@ -605,8 +605,6 @@ def solve_two_zone(
         aufguss_start = 0.0
         aufguss_duration = 0.0
 
-    # Heater characteristic diameter for virtual origin correction
-
 
     # Ventilation parameters
     vent_cfg = data.get("ventilation")
@@ -620,17 +618,11 @@ def solve_two_zone(
     rho_0 = 1.1  # reference density at ~300K [kg/m3]
     cp = 1005.0
 
-    # Steam properties
-    L_VAPORIZATION = 2.26e6  # latent heat of water [J/kg]
-    MW_STEAM = 18.015e-3     # molecular weight of steam [kg/mol]
-    R_GAS = 8.314            # universal gas constant [J/(mol*K)]
-    P_ATM = 101325.0         # atmospheric pressure [Pa]
-
     # Wall thermal model
     wall_cfg = walls.get("model", "fixed")  # "fixed" or "lumped"
-    wall_thickness = walls.get("thickness", 0.02)  # wood panel [m]
+    wall_thickness = walls.get("thickness", 0.015)  # wood panel [m]
     wall_lambda = walls.get("conductivity", 0.12)  # wood thermal conductivity [W/(m*K)]
-    wall_rho_cp = walls.get("rho_cp", 0.4e6)  # wood volumetric heat capacity [J/(m3*K)]
+    wall_rho_cp = walls.get("rho_cp", 0.5e6)  # wood volumetric heat capacity [J/(m3*K)] (rho=450,cp=1100)
     h_wall_base = 8.0  # base natural convection HTC [W/(m2*K)]
 
     perimeter = 2 * (width + depth)
@@ -909,8 +901,6 @@ def solve_transient(
         aufguss_start = 0.0
         aufguss_duration = 0.0
 
-    # Heater characteristic diameter for virtual origin correction
-
 
     # Ventilation parameters
     vent_cfg = data.get("ventilation")
@@ -928,9 +918,9 @@ def solve_transient(
     P_ATM = 101325.0
 
     wall_cfg = walls.get("model", "fixed")
-    wall_thickness = walls.get("thickness", 0.02)
+    wall_thickness = walls.get("thickness", 0.015)
     wall_lambda = walls.get("conductivity", 0.12)
-    wall_rho_cp = walls.get("rho_cp", 0.4e6)
+    wall_rho_cp = walls.get("rho_cp", 0.5e6)
 
     perimeter = 2 * (width + depth)
 
