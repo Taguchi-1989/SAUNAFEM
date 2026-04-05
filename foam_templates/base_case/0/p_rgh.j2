@@ -8,27 +8,27 @@ FoamFile
 
 dimensions      [1 -1 -2 0 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform 101325;
 
 boundaryField
 {
     "(floor|ceiling|heater_wall|heater_wall_surround|opposite_wall|front|back)"
     {
         type            fixedFluxPressure;
-        value           uniform 0;
+        value           uniform 101325;
     }
 {% if ventilation | default(false) %}
     supply_vent
     {
         type            totalPressure;
-        p0              uniform 0;
-        value           uniform 0;
+        p0              uniform 101325;
+        value           uniform 101325;
     }
     exhaust_vent
     {
         type            totalPressure;
-        p0              uniform 0;
-        value           uniform 0;
+        p0              uniform 101325;
+        value           uniform 101325;
     }
 {% endif %}
 }
