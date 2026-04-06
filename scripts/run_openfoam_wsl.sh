@@ -32,16 +32,16 @@ echo "=== blockMesh ==="
 blockMesh 2>&1 | tail -5
 
 echo ""
-echo "=== Configure: 30s run ==="
-foamDictionary system/controlDict -entry endTime -set 30
-foamDictionary system/controlDict -entry writeInterval -set 10
-foamDictionary system/controlDict -entry deltaT -set 0.001
-foamDictionary system/controlDict -entry maxCo -set 0.3
-foamDictionary system/controlDict -entry maxDeltaT -set 0.5
+echo "=== Configure: 300s full run ==="
+foamDictionary system/controlDict -entry endTime -set 300
+foamDictionary system/controlDict -entry writeInterval -set 50
+foamDictionary system/controlDict -entry deltaT -set 0.01
+foamDictionary system/controlDict -entry maxCo -set 0.5
+foamDictionary system/controlDict -entry maxDeltaT -set 1.0
 
 echo ""
-echo "=== buoyantPimpleFoam (30s) ==="
-buoyantPimpleFoam 2>&1 | tail -40
+echo "=== buoyantPimpleFoam (300s) ==="
+buoyantPimpleFoam 2>&1 | tail -60
 
 echo ""
 echo "=== Copying results back ==="
