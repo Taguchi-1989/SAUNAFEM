@@ -525,9 +525,19 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     radiation_cfg = data.get("radiation", {})
     radiation_model = radiation_cfg.get("model", "none") if radiation_cfg else "none"
 
+    # Run simple solver to get wall inner temperature for BC initialization
+    t_wall_inner = heater["T_walls"]  # fallback to external wall temp
+    try:
+        from harness.simple_solver import solve_two_zone
+        _simple = solve_two_zone(case_yaml, max_iter=10000)
+        t_wall_inner = round(_simple.wall_inner_temp, 2)
+    except Exception:
+        pass
+
     context = {
         **mesh,
         **heater,
+        "T_wall_inner": t_wall_inner,
         "solver_name": solver_name,
         "end_time": end_time,
         "write_interval": write_interval,

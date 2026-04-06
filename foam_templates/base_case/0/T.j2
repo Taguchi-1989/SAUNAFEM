@@ -18,13 +18,13 @@ boundaryField
     floor
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 
     ceiling
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 
     heater_wall
@@ -36,25 +36,25 @@ boundaryField
     heater_wall_surround
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 
     opposite_wall
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 
     front
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 
     back
     {
         type            fixedValue;
-        value           uniform {{ T_walls }};
+        value           uniform {{ T_wall_inner | default(T_walls) }};
     }
 {% if ventilation | default(false) %}
     supply_vent
