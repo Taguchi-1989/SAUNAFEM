@@ -319,7 +319,7 @@ class TestBuoyancyProduction:
         render_templates(self._TEMPLATE_DIR, tmp_path, ctx, skip_templates=["0/H2O.j2", "0/IDefault.j2"])
         fvoptions = (tmp_path / "constant" / "fvOptions").read_text(encoding="utf-8")
         assert "buoyancyProduction" in fvoptions
-        assert "type            coded;" in fvoptions
+        assert "scalarCodedSource" in fvoptions
         assert "buoyancyProductionK" in fvoptions
         assert "fvc::grad(rho)" in fvoptions
 

@@ -9,17 +9,12 @@ FoamFile
 {% if buoyancy_production | default(true) %}
 buoyancyProduction
 {
-    type            coded;
+    type            scalarCodedSource;
     name            buoyancyProductionK;
     active          true;
     selectionMode   all;
 
-    codeOptions
-    #{
-        fields  (k);
-    #};
-
-    buoyancyProductionKCoeffs
+    scalarCodedSourceCoeffs
     {
         selectionMode   all;
         fields          (k);
