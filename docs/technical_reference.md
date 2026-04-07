@@ -30,7 +30,7 @@
 | 定圧比熱 | $c_p$ | 1005 | J/(kg·K) | Incropera et al., "Fundamentals of Heat and Mass Transfer", 7th ed., Table A.4 | 熱力学 | 300K における乾燥空気の定圧比熱。サウナ温度域 (293-373K) での変動は ±2% 以内のため定数扱いが妥当 |
 | 動粘性係数 | $\mu$ | 1.8×10⁻⁵ | Pa·s | Sutherland の式から 300K の値。Incropera, Table A.4 | 流体力学 | Sutherland の式: $\mu = \mu_0 (T/T_0)^{3/2} (T_0 + S)/(T + S)$ ($\mu_0 = 1.716 \times 10^{-5}$, $T_0 = 273.15$ K, $S = 110.4$ K)。本計算では温度依存性を無視し const transport で代用 |
 | プラントル数 | $Pr$ | 0.7 | — | 空気の実験値。Schlichting, "Boundary Layer Theory", 8th ed. | 伝熱工学 | $Pr = \nu / \alpha = \mu c_p / \lambda$。気体は分子運動論から $Pr \approx 4\gamma/(9\gamma-5)$（$\gamma = 1.4$ → $Pr \approx 0.74$）。実験値は 0.707 (300K)。温度依存小 |
-| 熱伝導率 | $\lambda$ | 0.0258 | W/(m·K) | $\lambda = \mu c_p / Pr$ から導出 | 伝熱工学 | $1.8 \times 10^{-5} \times 1005 / 0.7 = 0.0258$。OpenFOAM では $\mu$ と $Pr$ から内部計算 |
+| 熱伝導率 | $\lambda$ | 0.026 | W/(m·K) | $\lambda = \mu c_p / Pr$ から導出 | 伝熱工学 | 厳密には $0.0258$ だが、簡易版コードでは $0.026$ に丸めて使用。OpenFOAM では $\mu$ と $Pr$ から内部計算 |
 | 重力加速度 | $g$ | 9.81 | m/s² | WGS 84 標準重力 | 力学 | 日本の緯度 (35°N) での値は 9.798 m/s² だが、工学的に 9.81 を使用 |
 
 **本計算での使用:**
@@ -331,10 +331,10 @@ $$
 **オリフィス流量:**
 
 $$
-\dot{m}_{\text{vent}} = C_d \, A_{\text{eff}} \, \sqrt{2 \rho \lvert \Delta p \rvert} \cdot \text{sign}(\Delta p)
+\dot{m}_{\text{vent}} = A_{\text{eff}} \, \sqrt{2 \rho \lvert \Delta p \rvert} \cdot \text{sign}(\Delta p)
 $$
 
-- $A_{\text{eff}} = \min(C_d A_{\text{supply}}, C_d A_{\text{exhaust}})$: 流量制限側の実効面積
+- $A_{\text{eff}} = \min(C_{d,s} A_{\text{supply}}, C_{d,e} A_{\text{exhaust}})$: $C_d$ を含む実効面積
 - $\rho$: 上流側の密度（流入時は外気、流出時は室内空気）
 
 - **出典:** ASHRAE Handbook — Fundamentals (2017), Ch.16 "Ventilation and Infiltration"
@@ -432,7 +432,7 @@ $$
 ### 3.6 界面の質量保存
 
 $$
-A_{\text{floor}} \frac{dz_{\text{int}}}{dt} = -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}} + \dot{V}_{\text{vent}}
+A_{\text{floor}} \frac{dz_{\text{int}}}{dt} = -\frac{\dot{m}_p}{\rho_{\text{upper}}} + \dot{V}_{\text{return}} - \dot{V}_{\text{steam}} + \dot{V}_{\text{mix}} + \dot{V}_{\text{vent}}
 $$
 
 **導出:**
@@ -442,7 +442,8 @@ $$
 3. 上層への体積流入 = プルーム $\dot{m}_p / \rho_{\text{upper}}$
 4. 上層からの体積流出 = 壁面下降流 $\dot{V}_{\text{return}}$
 5. 蒸気膨張 = $\dot{V}_{\text{steam}}$（界面を押し下げる）
-6. 換気 = $\dot{V}_{\text{vent}}$（新鮮空気流入で界面を押し上げる）
+6. Aufguss 混合 = $\dot{V}_{\text{mix}} = \beta_{\text{aug}} (1/\rho_{\text{lower}} - 1/\rho_{\text{upper}})$（密度差による正味体積効果）
+7. 換気 = $\dot{V}_{\text{vent}} = \dot{m}_{\text{vent}} / \rho_{\text{lower}}$（新鮮空気流入で界面を押し上げる）
 
 **リターンフロー $\dot{V}_{\text{return}}$ の根拠:**
 
@@ -1053,12 +1054,17 @@ $$
 |--------|---------|---------------|-------------|
 | 連続の式 | Euler (1757) | buoyantPimpleFoam 内部 | — (0D, 界面質量保存で代替) |
 | N-S | Navier-Stokes (1822/1845) | buoyantPimpleFoam 内部 | — (速度を解かない) |
-| エネルギー保存 | 第一法則 | buoyantPimpleFoam 内部 | `simple_solver.py:172-207` |
-| 状態方程式 | 理想気体 | `thermophysicalProperties` | `simple_solver.py:164-165` |
+| エネルギー保存 | 第一法則 | buoyantPimpleFoam 内部 | `simple_solver.py` `solve_two_zone()` L707-776 |
+| 状態方程式 | 理想気体 | `thermophysicalProperties` | `simple_solver.py` L683-684 |
 | SST k-omega | Menter (1994) | `turbulenceProperties` | — (相関式に内包) |
-| Zukoski プルーム | Zukoski (1978) | — | `simple_solver.py:77-84` |
-| Newton 冷却 | Newton (1701) | — (壁面関数+BC) | `simple_solver.py:179,193` |
-| 界面質量保存 | Cooper (1982) | — | `simple_solver.py:213-216` |
+| Zukoski プルーム | Zukoski (1978) | — | `simple_solver.py` `_plume_entrainment()` L164-209 |
+| Newton 冷却 | Newton (1701) | — (壁面関数+BC) | `simple_solver.py` L714, L754 |
+| 界面質量保存 | Cooper (1982) | — | `simple_solver.py` L778-789 |
+| 壁面 lumped | Incropera Ch.5 | — | `simple_solver.py` L796-806 |
+| 換気 (stack effect) | ASHRAE 2017 | — | `simple_solver.py` `_ventilation_flow()` L282-355 |
+| 体感温度 (皮膚熱収支) | ISO 7933 | — | `simple_solver.py` `_perceived_temperature()` L227-279 |
+| 人体輻射 | Stefan-Boltzmann | — | `simple_solver.py` `_q_rad_body()` L415-456 |
+| View Factor | Hottel & Sarofim | — | `simple_solver.py` `_compute_view_factors()` L76-161 |
 
 ## 付録 B: 参考文献一覧
 

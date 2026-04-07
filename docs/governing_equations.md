@@ -282,6 +282,8 @@ $$
 \rho_{\text{upper}} \, c_p \, V_{\text{upper}} \, \frac{dT_{\text{upper}}}{dt}
 = \underbrace{\dot{m}_p \, c_p \, (T_{\text{plume}} - T_{\text{upper}})}_{\text{プルームからの熱入力}}
 - \underbrace{h_{\text{wall}} \, A_{\text{wall,upper}} \, (T_{\text{upper}} - T_{\text{wall,inner}})}_{\text{壁面への熱損失}}
++ \underbrace{\dot{m}_{\text{vent}} \, c_p \, (T_{\text{lower}} - T_{\text{upper}})}_{\text{換気（上層冷却）}}
++ \underbrace{Q_{\text{rad,upper}}}_{\text{輻射（fixed壁のみ）}}
 $$
 
 ここで:
@@ -290,6 +292,8 @@ $$
 - $A_{\text{wall,upper}} = P \times (H - z_{\text{int}}) + A_{\text{floor}}$: 上層が接する壁面積 (側壁 + 天井) [m²]
 - $P = 2(W + D)$: 水平断面の周長 [m]
 - $T_{\text{wall,inner}}$: 壁面内面温度（lumped壁面モデルで計算。`model: fixed` の場合は $T_{\text{wall,outer}}$ 固定）
+- $\dot{m}_{\text{vent}}$: 換気質量流量 [kg/s]（換気モデル §10 参照。`model: none` の場合は 0）
+- $Q_{\text{rad,upper}}$: `model: fixed` の場合 $= Q_{\text{rad}} \times (1 - f_{\text{rad,lower}})$、`model: lumped` の場合 $= 0$
 
 **注:** ロウリュ（蒸気）は上層の湿度 $w$ を変化させるが、
 蒸発潜熱はヒーター石から奪われるため、上層空気に正味のエネルギー追加はない。
@@ -301,6 +305,7 @@ $$
 = \underbrace{Q_{\text{rad,lower}}}_{\text{輻射受熱}}
 + \underbrace{k_{\text{int}} \, A_{\text{floor}} \, \frac{T_{\text{upper}} - T_{\text{lower}}}{0.1 H}}_{\text{界面伝導}}
 - \underbrace{h_{\text{wall}} \, A_{\text{wall,lower}} \, (T_{\text{lower}} - T_{\text{wall,inner}})}_{\text{壁面への熱損失}}
++ \underbrace{\dot{m}_{\text{vent}} \, c_p \, (T_{\text{ambient}} - T_{\text{lower}})}_{\text{換気（新鮮空気流入）}}
 $$
 
 **輻射経路（壁面モデルに依存）:**
@@ -598,10 +603,11 @@ PIMPLE (PISO + SIMPLE の融合) アルゴリズム。
 | 項目 | 値 |
 |------|-----|
 | 解法 | 前進 Euler（擬似時間ステップ $\Delta t = 0.5$） |
-| 状態変数 | $T_{\text{upper}}$, $T_{\text{lower}}$, $z_{\text{int}}$ |
-| 収束判定 | $\max(\lvert T_{\text{upper}}^{n+1} - T_{\text{upper}}^n \rvert, \; 10 \lvert z_{\text{int}}^{n+1} - z_{\text{int}}^n \rvert) < 10^{-4}$ |
-| 最大反復数 | 10,000 |
-| 物理クリッピング | $T_{\text{upper}} \in [T_{\text{wall}},\; T_{\text{wall}}+200]$ K |
+| 状態変数 | $T_{\text{upper}}$, $T_{\text{lower}}$, $z_{\text{int}}$, $T_{\text{wall,inner}}$, $w$ |
+| 収束判定 | $\max(\lvert \Delta T_{\text{upper}} \rvert, \; \lvert \Delta T_{\text{lower}} \rvert, \; 10 \lvert \Delta z_{\text{int}} \rvert, \; \lvert \Delta T_{\text{wall,inner}} \rvert) < 10^{-4}$ |
+| 最大反復数 | 10,000（最低 100 反復） |
+| 物理クリッピング | $T_{\text{upper}} \in [T_{\text{wall,inner}},\; T_{\text{wall,inner}}+200]$ K |
+| | $T_{\text{lower}} \in [T_{\text{wall,outer}}-1, \; T_{\text{upper}}]$ |
 | | $z_{\text{int}} \in [0.05H,\; 0.95H]$ |
 
 ---
