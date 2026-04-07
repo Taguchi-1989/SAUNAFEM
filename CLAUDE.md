@@ -16,12 +16,14 @@ src/
 │   ├── cli.py          # CLI entry point
 │   ├── schema.py       # YAML/JSON schema validation
 │   ├── case_builder.py # Case definition → OpenFOAM directory
+│   ├── simple_solver.py # 2-Zone plume model (steady + transient)
+│   ├── batch.py        # Batch case runner and comparison
 │   ├── mesh_runner.py  # Mesh generation execution
 │   ├── solver_runner.py # Solver execution control
 │   ├── probe_parser.py # Probe output parsing
-│   ├── kpi.py          # KPI calculation (peak T, humidity, wind speed, arrival time)
+│   ├── kpi.py          # KPI calculation (K-01 to K-07)
 │   ├── validation.py   # CFD vs experimental comparison
-│   └── reporting.py    # Report generation (plots, tables, pass/fail)
+│   └── reporting.py    # Report generation (Markdown, JSON)
 ├── templates/          # OpenFOAM case templates
 │   └── base_case/      # Base OpenFOAM directory structure
 └── utils/              # Shared utilities

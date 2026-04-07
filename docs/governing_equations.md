@@ -862,17 +862,17 @@ PoC フェーズに適している。
 任意の給排気構成をサポートする。
 
 `model: "none"` (デフォルト) で従来の密閉モデル、
-`model: "natural"` で自然換気モデルを選択。
+`model: "supply_exhaust"` で自然換気モデルを選択。
 
 ### 10.2 煙突効果による駆動圧力
 
 $$
 \Delta p = \rho_{\text{amb}} \, g \, (z_{\text{exhaust}} - z_{\text{supply}}) \,
-\frac{T_{\text{exhaust}} - T_{\text{ambient}}}{T_{\text{ambient}}}
+\frac{T_{\text{col}} - T_{\text{ambient}}}{T_{\text{col}}}
 $$
 
 - $\rho_{\text{amb}}$: 外気密度 [kg/m³]
-- $T_{\text{exhaust}}$: 排気口位置のゾーン温度（界面位置に応じて $T_{\text{upper}}$ または $T_{\text{lower}}$）
+- $T_{\text{col}}$: 給排気口間の空気柱の加重平均温度（界面位置で下層/上層の寄与を按分）
 - $T_{\text{ambient}}$: 外気温 [K]
 
 ### 10.3 オリフィス流量モデル

@@ -56,9 +56,9 @@
             "temperature": { "type": "number" },
             "type": { "type": "string", "enum": ["fixed", "adiabatic", "mixed"] },
             "model": { "type": "string", "enum": ["fixed", "lumped"], "default": "fixed", "description": "Wall thermal model: fixed=constant T, lumped=wall heats up" },
-            "thickness": { "type": "number", "exclusiveMinimum": 0, "default": 0.02, "description": "Wall panel thickness [m]" },
+            "thickness": { "type": "number", "exclusiveMinimum": 0, "default": 0.015, "description": "Wall panel thickness [m]" },
             "conductivity": { "type": "number", "exclusiveMinimum": 0, "default": 0.12, "description": "Wall thermal conductivity [W/(m*K)]" },
-            "rho_cp": { "type": "number", "exclusiveMinimum": 0, "default": 400000, "description": "Wall volumetric heat capacity [J/(m3*K)]" }
+            "rho_cp": { "type": "number", "exclusiveMinimum": 0, "default": 500000, "description": "Wall volumetric heat capacity [J/(m3*K)]" }
           },
           "additionalProperties": false
         },
@@ -178,6 +178,12 @@
           "type": "number",
           "description": "Ambient air temperature at supply vent [K]",
           "default": 293.15
+        },
+        "w_ambient": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.005,
+          "description": "Ambient humidity ratio [kg vapor/kg dry air]"
         },
         "supply": {
           "type": "object",
