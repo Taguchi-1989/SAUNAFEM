@@ -72,7 +72,7 @@ PIMPLE
             relTol          0;
             tolerance       1e-4;
         }
-        T
+        h
         {
             relTol          0;
             tolerance       1e-5;
@@ -96,6 +96,7 @@ SIMPLE
 }
 {% endif %}
 
+{% if solver_name == "buoyantSimpleFoam" %}
 relaxationFactors
 {
     fields
@@ -112,3 +113,4 @@ relaxationFactors
         epsilon         0.5;
     }
 }
+{% endif %}

@@ -129,7 +129,10 @@ class OpenFOAMCaseResult:
     case_name: str
     case_dir: Path
     probe_values: dict[str, float] = field(default_factory=dict)
+    probe_timeseries: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
     heat_balance: HeatBalance | None = None
+    heat_balance_timeseries: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    vol_avg_t_timeseries: list[tuple[float, float]] = field(default_factory=list)
 
 
 def parse_openfoam_case(
@@ -148,6 +151,7 @@ def parse_openfoam_case(
 
     # Parse probes
     probe_values: dict[str, float] = {}
+    probe_ts: dict[str, list[tuple[float, float]]] = {}
     probe_dirs = sorted(
         (case_dir / "postProcessing" / "probes").glob("[0-9]*"),
     ) if (case_dir / "postProcessing" / "probes").exists() else []
@@ -157,6 +161,8 @@ def parse_openfoam_case(
         if t_file.exists():
             probe_data = parse_probe_file(t_file, probe_names)
             probe_values = get_steady_state_values(probe_data)
+            for pd in probe_data:
+                probe_ts[pd.probe_name] = list(zip(pd.times, pd.values))
 
     # Parse heat balance
     wall_fluxes = parse_wall_heat_flux(case_dir)
@@ -167,7 +173,10 @@ def parse_openfoam_case(
         case_name=name,
         case_dir=case_dir,
         probe_values=probe_values,
+        probe_timeseries=probe_ts,
         heat_balance=heat_balance,
+        heat_balance_timeseries=wall_fluxes,
+        vol_avg_t_timeseries=vol_avg,
     )
 
 
@@ -233,4 +242,79 @@ def compare_openfoam_results(
         lines.append(row)
 
     lines.append("")
+    return "\n".join(lines)
+
+
+def transient_report(
+    case_dir: Path,
+    probe_names: list[str],
+    case_name: str | None = None,
+) -> str:
+    """Generate a Markdown report for a transient OpenFOAM case.
+
+    Shows temperature evolution over time and heat balance snapshots.
+    """
+    result = parse_openfoam_case(case_dir, probe_names, case_name)
+    lines = [
+        f"# Transient Report: {result.case_name}",
+        "",
+    ]
+
+    # Probe temperature time history
+    lines.extend(["## Probe Temperature Evolution", ""])
+    if result.probe_timeseries:
+        # Build time points from first probe
+        first_probe = next(iter(result.probe_timeseries.values()))
+        times = [t for t, _ in first_probe]
+
+        # Sample at regular intervals (max 20 rows)
+        step = max(1, len(times) // 20)
+        sample_indices = list(range(0, len(times), step))
+        if sample_indices[-1] != len(times) - 1:
+            sample_indices.append(len(times) - 1)
+
+        header = "| Time [s] | " + " | ".join(f"{p} [C]" for p in probe_names) + " |"
+        sep = "| -------- | " + " | ".join("---" for _ in probe_names) + " |"
+        lines.extend([header, sep])
+
+        for idx in sample_indices:
+            t = times[idx]
+            row = f"| {t:.1f} |"
+            for pname in probe_names:
+                ts = result.probe_timeseries.get(pname, [])
+                if idx < len(ts):
+                    row += f" {ts[idx][1] - 273.15:.1f} |"
+                else:
+                    row += " -- |"
+            lines.append(row)
+        lines.append("")
+
+    # Final values
+    lines.extend(["## Final Values", ""])
+    for pname in probe_names:
+        val = result.probe_values.get(pname)
+        if val is not None:
+            lines.append(f"- **{pname}**: {val:.1f} K ({val - 273.15:.1f} C)")
+    lines.append("")
+
+    # Vol-avg T evolution
+    if result.vol_avg_t_timeseries:
+        lines.extend(["## Volume-Averaged Temperature", ""])
+        lines.append("| Time [s] | T_avg [K] | T_avg [C] |")
+        lines.append("| -------- | --------- | --------- |")
+        vt = result.vol_avg_t_timeseries
+        step = max(1, len(vt) // 15)
+        for i in range(0, len(vt), step):
+            t, v = vt[i]
+            lines.append(f"| {t:.1f} | {v:.1f} | {v - 273.15:.1f} |")
+        if (len(vt) - 1) % step != 0:
+            t, v = vt[-1]
+            lines.append(f"| {t:.1f} | {v:.1f} | {v - 273.15:.1f} |")
+        lines.append("")
+
+    # Heat balance
+    if result.heat_balance:
+        from harness.reporting import heat_balance_to_markdown
+        lines.append(heat_balance_to_markdown(result.heat_balance))
+
     return "\n".join(lines)

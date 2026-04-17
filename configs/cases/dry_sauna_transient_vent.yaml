@@ -1,0 +1,69 @@
+case:
+  name: dry_sauna_transient_vent
+  description: "Case D: transient warm-up with volume source + ventilation (buoyantPimpleFoam)"
+  type: transient
+
+geometry:
+  dimensions:
+    x: 3.0
+    y: 2.5
+    z: 2.5
+  mesh_level: M0
+
+boundary_conditions:
+  walls:
+    temperature: 293.15
+    type: mixed
+    model: lumped
+    thickness: 0.015
+    conductivity: 0.12
+    rho_cp: 500000
+  heater:
+    power_kw: 18.0
+    model: volume_source
+    depth: 0.3
+    position:
+      x: 0.0
+      y: 0.1
+      z: 1.25
+    width: 0.6
+    height: 0.5
+
+ventilation:
+  model: supply_exhaust
+  T_ambient: 293.15
+  supply:
+    height: 0.3
+    area: 0.01
+  exhaust:
+    height: 2.2
+    area: 0.015
+
+turbulence:
+  buoyancy_production: false
+
+solver:
+  name: buoyantPimpleFoam
+  end_time: 600
+  write_interval: 30
+  delta_t: 0.001
+  averaging_start: 300
+  uniform_init: true
+
+probes:
+  - name: upper_bench
+    position: { x: 1.5, y: 2.0, z: 1.25 }
+    fields: [T]
+  - name: lower_bench
+    position: { x: 1.5, y: 0.8, z: 1.25 }
+    fields: [T]
+  - name: floor_level
+    position: { x: 1.5, y: 0.1, z: 1.25 }
+    fields: [T]
+
+validation:
+  experimental_csv: "../../experiments/processed/dry_sauna_sample.csv"
+  tolerances:
+    upper_bench: 30.0
+    lower_bench: 30.0
+    floor_level: 30.0
