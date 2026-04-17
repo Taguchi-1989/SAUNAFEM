@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from harness.heat_balance_parser import HeatBalance
 from harness.validation import ValidationReport
 
 
@@ -70,3 +71,45 @@ def report_to_json(
     if output_path:
         output_path.write_text(text + "\n", encoding="utf-8")
     return text
+
+
+def heat_balance_to_markdown(balance: HeatBalance) -> str:
+    """Generate a Markdown heat balance summary table."""
+    abs_input = abs(balance.heater_input_W) or 1.0
+
+    lines = [
+        "## Heat Balance Summary",
+        "",
+        "| Component | Value [W] | % of Input |",
+        "|-----------|-----------|------------|",
+        f"| Heater input | {balance.heater_input_W:+.0f} | 100.0% |",
+        f"| Wall losses | {balance.wall_loss_W:+.0f} | {balance.wall_loss_W / abs_input * 100:.1f}% |",
+    ]
+
+    if abs(balance.vent_loss_W) > 0.1:
+        lines.append(
+            f"| Vent losses | {balance.vent_loss_W:+.0f} | {balance.vent_loss_W / abs_input * 100:.1f}% |"
+        )
+
+    lines.extend([
+        f"| **Imbalance** | **{balance.imbalance_W:+.0f}** | **{balance.imbalance_pct:.1f}%** |",
+        "",
+    ])
+
+    if balance.vol_avg_T > 0:
+        t_c = balance.vol_avg_T - 273.15
+        lines.append(f"Volume-averaged T: {balance.vol_avg_T:.1f} K ({t_c:.1f} C)")
+        lines.append("")
+
+    if balance.patch_fluxes:
+        lines.extend([
+            "### Per-patch breakdown",
+            "",
+            "| Patch | Flux [W] |",
+            "|-------|----------|",
+        ])
+        for patch, flux in sorted(balance.patch_fluxes.items()):
+            lines.append(f"| {patch} | {flux:+.1f} |")
+        lines.append("")
+
+    return "\n".join(lines)

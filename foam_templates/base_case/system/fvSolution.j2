@@ -84,13 +84,13 @@ SIMPLE
 {
     nNonOrthogonalCorrectors 0;
     pRefCell        0;
-    pRefValue       0;
+    pRefValue       101325;
 
     residualControl
     {
         p_rgh           1e-4;
         U               1e-4;
-        T               1e-5;
+        h               1e-5;
         "(k|omega|epsilon)" 1e-4;
     }
 }
@@ -100,14 +100,15 @@ relaxationFactors
 {
     fields
     {
+        rho             0.5;
         p_rgh           0.3;
     }
     equations
     {
-        U               0.7;
-        T               0.5;
-        k               0.7;
-        omega           0.7;
-        epsilon         0.7;
+        U               0.5;
+        h               0.2;
+        k               0.5;
+        omega           0.5;
+        epsilon         0.5;
     }
 }

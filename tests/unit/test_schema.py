@@ -49,6 +49,34 @@ class TestValidateCase:
         assert len(errors) > 0
 
 
+class TestHeaterModelSchema:
+    def test_surface_flux_valid(self, sample_case_path: Path) -> None:
+        data = load_yaml(sample_case_path)
+        data["boundary_conditions"]["heater"]["model"] = "surface_flux"
+        errors = validate_case(data)
+        assert errors == []
+
+    def test_volume_source_valid(self, sample_case_path: Path) -> None:
+        data = load_yaml(sample_case_path)
+        data["boundary_conditions"]["heater"]["model"] = "volume_source"
+        data["boundary_conditions"]["heater"]["depth"] = 0.3
+        errors = validate_case(data)
+        assert errors == []
+
+    def test_invalid_model_rejected(self, sample_case_path: Path) -> None:
+        data = load_yaml(sample_case_path)
+        data["boundary_conditions"]["heater"]["model"] = "invalid"
+        errors = validate_case(data)
+        assert len(errors) > 0
+
+    def test_no_model_defaults_ok(self, sample_case_path: Path) -> None:
+        """Existing YAML without heater.model should still pass."""
+        data = load_yaml(sample_case_path)
+        assert "model" not in data["boundary_conditions"]["heater"]
+        errors = validate_case(data)
+        assert errors == []
+
+
 class TestLoadAndValidate:
     def test_valid_file(self, sample_case_path: Path) -> None:
         errors = load_and_validate(sample_case_path)

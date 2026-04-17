@@ -1,0 +1,57 @@
+case:
+  name: dry_sauna_steady_volsource
+  description: "Case B: volume heat source heater model (fvOptions scalarSemiImplicitSource)"
+  type: steady
+
+geometry:
+  dimensions:
+    x: 3.0
+    y: 2.5
+    z: 2.5
+  mesh_level: M0
+
+boundary_conditions:
+  walls:
+    temperature: 293.15
+    type: mixed
+    model: lumped
+    thickness: 0.015
+    conductivity: 0.12
+    rho_cp: 500000
+  heater:
+    power_kw: 18.0
+    model: volume_source
+    depth: 0.3
+    position:
+      x: 0.0
+      y: 0.1
+      z: 1.25
+    width: 0.6
+    height: 0.5
+
+turbulence:
+  buoyancy_production: false
+
+solver:
+  name: buoyantSimpleFoam
+  end_time: 30000
+  write_interval: 5000
+  uniform_init: true
+
+probes:
+  - name: upper_bench
+    position: { x: 1.5, y: 2.0, z: 1.25 }
+    fields: [T]
+  - name: lower_bench
+    position: { x: 1.5, y: 0.8, z: 1.25 }
+    fields: [T]
+  - name: floor_level
+    position: { x: 1.5, y: 0.1, z: 1.25 }
+    fields: [T]
+
+validation:
+  experimental_csv: "../../experiments/processed/dry_sauna_sample.csv"
+  tolerances:
+    upper_bench: 30.0
+    lower_bench: 30.0
+    floor_level: 30.0

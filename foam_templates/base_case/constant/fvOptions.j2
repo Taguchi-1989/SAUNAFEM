@@ -119,6 +119,30 @@ aufgussJet
 }
 {% endif %}
 
-{% if not (buoyancy_production | default(true)) and not aufguss_enabled %}
+{% if heater_model | default("surface_flux") == "volume_source" %}
+heaterSource
+{
+    type            scalarSemiImplicitSource;
+    active          true;
+    selectionMode   cellZone;
+    cellZone        heaterZone;
+
+    scalarSemiImplicitSourceCoeffs
+    {
+        selectionMode   cellZone;
+        cellZone        heaterZone;
+        volumeMode      specific;
+
+        sources
+        {
+            // Power per unit volume [W/m3]
+            // = total_power / (depth * height * width)
+            h           ({{ heater_power_density }} 0);
+        }
+    }
+}
+{% endif %}
+
+{% if not (buoyancy_production | default(true)) and not aufguss_enabled and heater_model | default("surface_flux") != "volume_source" %}
 // No fvOptions active
 {% endif %}

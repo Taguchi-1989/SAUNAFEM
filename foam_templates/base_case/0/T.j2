@@ -37,11 +37,20 @@ boundaryField
 
     heater_wall
     {
+{% if heater_model | default("surface_flux") == "volume_source" %}
+        type            externalWallHeatFluxTemperature;
+        mode            coefficient;
+        h               uniform {{ wall_htc | default(1.0) }};
+        Ta              uniform {{ T_walls }};
+        kappaMethod     fluidThermo;
+        value           uniform {{ T_wall_inner | default(T_walls) }};
+{% else %}
         type            externalWallHeatFluxTemperature;
         mode            flux;
         q               uniform {{ heat_flux }};
         kappaMethod     fluidThermo;
         value           uniform {{ T_heater | default(473.15) }};
+{% endif %}
     }
 
     heater_wall_surround

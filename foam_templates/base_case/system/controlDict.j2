@@ -86,4 +86,22 @@ functions
             }
         );
     }
+
+    wallHeatFlux
+    {
+        type            wallHeatFlux;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+    }
+
+    volAverageT
+    {
+        type            volFieldValue;
+        libs            (fieldFunctionObjects);
+        writeControl    writeTime;
+        writeFields     false;
+        log             true;
+        operation       volAverage;
+        fields          (T);
+    }
 }

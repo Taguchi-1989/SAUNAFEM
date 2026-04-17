@@ -58,7 +58,8 @@
             "model": { "type": "string", "enum": ["fixed", "lumped"], "default": "fixed", "description": "Wall thermal model: fixed=constant T, lumped=wall heats up" },
             "thickness": { "type": "number", "exclusiveMinimum": 0, "default": 0.015, "description": "Wall panel thickness [m]" },
             "conductivity": { "type": "number", "exclusiveMinimum": 0, "default": 0.12, "description": "Wall thermal conductivity [W/(m*K)]" },
-            "rho_cp": { "type": "number", "exclusiveMinimum": 0, "default": 500000, "description": "Wall volumetric heat capacity [J/(m3*K)]" }
+            "rho_cp": { "type": "number", "exclusiveMinimum": 0, "default": 500000, "description": "Wall volumetric heat capacity [J/(m3*K)]" },
+            "wall_htc_override": { "type": "number", "exclusiveMinimum": 0, "description": "Override wall heat transfer coefficient [W/(m2*K)]. If set, ignores thickness/conductivity calculation." }
           },
           "additionalProperties": false
         },
@@ -92,6 +93,18 @@
               "exclusiveMinimum": 0,
               "default": 0.5,
               "description": "Heater height in meters (y-direction)"
+            },
+            "model": {
+              "type": "string",
+              "enum": ["surface_flux", "volume_source"],
+              "default": "surface_flux",
+              "description": "Heater model: surface_flux (wall heat flux BC) or volume_source (fvOptions in cellZone)"
+            },
+            "depth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.3,
+              "description": "Heater depth in x-direction [m] (used for volume_source cellZone)"
             }
           },
           "additionalProperties": false
@@ -125,6 +138,11 @@
           "enum": ["pure", "multiComponent"],
           "default": "pure",
           "description": "Thermophysical mixture type"
+        },
+        "uniform_init": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use uniform initial fields (skip 2-zone plume initialization)"
         }
       },
       "additionalProperties": false
@@ -246,6 +264,11 @@
           "enum": ["linearUpwind", "vanLeer", "limitedLinear"],
           "default": "linearUpwind",
           "description": "Convection scheme for T/h: linearUpwind (2nd order) or TVD limiter"
+        },
+        "buoyancy_production": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable buoyancy production source in k-equation (requires wmake for codedSource)"
         }
       },
       "additionalProperties": false

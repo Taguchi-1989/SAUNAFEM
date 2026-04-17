@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness.reporting import report_to_dict, report_to_markdown
+from harness.heat_balance_parser import HeatBalance
+from harness.reporting import heat_balance_to_markdown, report_to_dict, report_to_markdown
 from harness.validation import ValidationPoint, ValidationReport
 
 
@@ -32,6 +33,35 @@ class TestMarkdownReport:
         report_to_markdown(report, out)
         assert out.exists()
         assert "PASS" in out.read_text(encoding="utf-8")
+
+
+class TestHeatBalanceReport:
+    def test_generates_markdown_table(self) -> None:
+        hb = HeatBalance(
+            heater_input_W=18000.0,
+            wall_loss_W=-17500.0,
+            vent_loss_W=-200.0,
+            vol_avg_T=358.2,
+            patch_fluxes={"heater_wall": 18000.0, "floor": -5000.0, "ceiling": -6000.0},
+        )
+        md = heat_balance_to_markdown(hb)
+        assert "Heat Balance Summary" in md
+        assert "+18000" in md
+        assert "-17500" in md
+        assert "-200" in md
+        assert "358.2 K" in md
+        assert "85.1 C" in md
+        assert "heater_wall" in md
+
+    def test_no_vent_row_when_zero(self) -> None:
+        hb = HeatBalance(heater_input_W=18000.0, wall_loss_W=-17000.0)
+        md = heat_balance_to_markdown(hb)
+        assert "Vent" not in md
+
+    def test_no_vol_avg_when_zero(self) -> None:
+        hb = HeatBalance(heater_input_W=18000.0, wall_loss_W=-17000.0)
+        md = heat_balance_to_markdown(hb)
+        assert "Volume-averaged" not in md
 
 
 class TestDictReport:

@@ -267,6 +267,12 @@ def compute_heater_params(boundary_conditions: dict, geometry: dict) -> dict:
     t_heater_raw = t_walls + heat_flux / h_eff_heater
     t_heater = min(t_heater_raw, t_walls + 300)  # cap at wall+300K (~600K max)
 
+    heater_model = heater.get("model", "surface_flux")
+    heater_depth = heater.get("depth", 0.3)
+    heater_power_w = power_kw * 1000.0
+    heater_volume = heater_depth * height * width
+    heater_power_density = heater_power_w / max(heater_volume, 1e-9)
+
     return {
         "heat_flux": round(heat_flux, 2),
         "heater_width": width,
@@ -274,6 +280,10 @@ def compute_heater_params(boundary_conditions: dict, geometry: dict) -> dict:
         "T_walls": t_walls,
         "T_initial": t_walls,
         "T_heater": round(t_heater, 2),
+        "heater_model": heater_model,
+        "heater_depth": heater_depth,
+        "heater_power_W": round(heater_power_w, 2),
+        "heater_power_density": round(heater_power_density, 2),
     }
 
 
@@ -538,7 +548,11 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     walls = data["boundary_conditions"].get("walls", {})
     wall_thickness = walls.get("thickness", 0.08)
     wall_conductivity = walls.get("conductivity", 0.12)
-    wall_htc = wall_conductivity / max(wall_thickness, 0.01)  # W/(m²K)
+    wall_htc_override = walls.get("wall_htc_override")
+    if wall_htc_override is not None:
+        wall_htc = wall_htc_override
+    else:
+        wall_htc = wall_conductivity / max(wall_thickness, 0.01)  # W/(m²K)
 
     context = {
         **mesh,
@@ -580,8 +594,10 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     render_templates(_TEMPLATE_DIR, output_dir, context, skip_templates=skip)
 
     # Initialize T and p_rgh from simple solver steady solution
-    _generate_initial_fields(
-        case_yaml, output_dir, data["geometry"], mesh, data["boundary_conditions"],
-    )
+    uniform_init = solver.get("uniform_init", False)
+    if not uniform_init:
+        _generate_initial_fields(
+            case_yaml, output_dir, data["geometry"], mesh, data["boundary_conditions"],
+        )
 
     return output_dir
