@@ -1,0 +1,70 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      viewFactorsDict;
+}
+
+{% if radiation_model | default("none") == "viewFactor" %}
+writeFacesAgglomeration true;
+
+// Face agglomeration settings for viewFactorsGen
+// nFacesInCoarsestLevel controls coarsening: fewer = faster but less accurate
+
+floor
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+ceiling
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+heater_wall
+{
+    nFacesInCoarsestLevel   5;
+    featureAngle            10;
+}
+
+heater_wall_surround
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+opposite_wall
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+front
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+back
+{
+    nFacesInCoarsestLevel   10;
+    featureAngle            10;
+}
+
+{% if ventilation | default(false) %}
+supply_vent
+{
+    nFacesInCoarsestLevel   1;
+    featureAngle            10;
+}
+
+exhaust_vent
+{
+    nFacesInCoarsestLevel   1;
+    featureAngle            10;
+}
+{% endif %}
+{% endif %}

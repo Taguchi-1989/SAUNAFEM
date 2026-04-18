@@ -727,7 +727,7 @@ class TestRadiationTemplate:
         rad = (tmp_path / "constant" / "radiationProperties").read_text(encoding="utf-8")
         assert "radiation       on" in rad
         assert "radiationModel  viewFactor" in rad
-        assert "greyMeanAbsorptionEmission" in rad
+        assert "constantAbsorptionEmission" in rad
 
     def test_fvdom_renders_coeffs(self, tmp_path: Path) -> None:
         """fvDOM radiation model renders fvDOMCoeffs block."""

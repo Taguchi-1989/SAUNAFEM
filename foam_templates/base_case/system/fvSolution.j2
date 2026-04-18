@@ -49,6 +49,14 @@ solvers
         $U;
         relTol          0;
     }
+
+    "Ii.*"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-7;
+        relTol          0.1;
+    }
 }
 
 {% if solver_name == "buoyantPimpleFoam" %}

@@ -46,6 +46,9 @@ divSchemes
 {% if species_transport | default(false) %}
     div(phi,Yi_h)   bounded Gauss linearUpwind default;
 {% endif %}
+{% if radiation_model | default("none") == "fvDOM" %}
+    div(Ji,Ii_h)    bounded Gauss linearUpwind default;
+{% endif %}
 }
 
 laplacianSchemes

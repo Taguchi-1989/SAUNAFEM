@@ -591,6 +591,19 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
     if radiation_model != "fvDOM":
         skip.append("0/IDefault.j2")
 
+    # Skip radiation-specific files when radiation is disabled
+    if radiation_model == "none":
+        skip.append("constant/viewFactorsDict.j2")
+        skip.append("constant/boundaryRadiationProperties.j2")
+        skip.append("0/qr.j2")
+    elif radiation_model == "fvDOM":
+        # fvDOM needs boundaryRadiationProperties but not viewFactorsDict/qr
+        skip.append("constant/viewFactorsDict.j2")
+        skip.append("0/qr.j2")
+    elif radiation_model == "viewFactor":
+        # viewFactor doesn't need IDefault
+        pass
+
     render_templates(_TEMPLATE_DIR, output_dir, context, skip_templates=skip)
 
     # Initialize T and p_rgh from simple solver steady solution
