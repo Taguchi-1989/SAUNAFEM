@@ -17,4 +17,8 @@ RAS
 {% endif %}
     turbulence      on;
     printCoeffs     on;
+
+    // Prevent excessive turbulence decay in buoyancy-driven flows
+    // kMin sets a floor on turbulent kinetic energy to maintain mixing
+    kMin            0.01;
 }
