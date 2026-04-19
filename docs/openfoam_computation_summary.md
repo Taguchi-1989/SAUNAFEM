@@ -380,6 +380,142 @@ pytest tests/unit/test_heat_balance_parser.py -v
 
 ---
 
-**作成日**: 2026-04-17  
-**ハーネスバージョン**: SaunaFlow Phase 2 (Heat Balance + Heater A/B)  
+## 12. viewFactor 放射モデル実装 (2026-04-19)
+
+### 12.1 問題: fvDOM は透明媒体で無効
+
+前セッションで fvDOM 放射モデルを実装したが、空気は赤外線にほぼ透明であり、fvDOM は体積吸収・放射を前提とするため効果なし。サウナの放射伝熱は **面間放射** (ヒーター表面 300-500°C → 壁面) が支配的であり、viewFactor モデルが必要。
+
+### 12.2 viewFactor "coarse faces: 0" 修正
+
+viewFactorsGen が "coarse faces: 0" を出力し、ビューファクター計算不能だった問題を解決。
+
+**根本原因と修正内容**
+
+| # | 原因 | 修正 |
+|---|------|------|
+| 1 | **パッチが viewFactorWall グループ未所属** | `blockMeshDict.j2`: 全7壁パッチに `inGroups 2(wall viewFactorWall)` 追加 |
+| 2 | **faceAgglomerate 未実行** | `run_openfoam_wsl.sh`, `run_case_d.sh`: `faceAgglomerate -dict constant/viewFactorsDict` → `finalAgglom` 検証 → `viewFactorsGen` |
+| 3 | **吸収係数に次元なし** (ESI v2312) | `radiationProperties.j2`: `absorptivity [0 -1 0 0 0 0 0] 0.0` 形式に修正 |
+| 4 | **GAMG ソルバー非対応** | `useDirectSolver true` に変更（viewFactor 内部 lduMesh は GAMG 非対応） |
+| 5 | **emissivityMode 不整合** | `qr.j2`: `lookup` → `solidRadiation` (boundaryRadiationProperties 参照) |
+| 6 | **qr ソルバー未定義** | `fvSolution.j2`: `qr`/`qrFinal` GAMG ソルバー追加（useDirectSolver=true では不使用） |
+
+**修正後**: `faceAgglomerate` exit=0, `viewFactorsGen` exit=0, **coarse faces: 44**
+
+### 12.3 ヒーター壁温度と放射の方向性
+
+viewFactor は面間放射を計算するため、各面の温度が放射方向を決定する。
+
+**問題**: `volume_source` モデルでは cellZone 内部に熱源を分布させるが、ヒーター壁パッチ自体は `externalWallHeatFluxTemperature` BC であり、壁面温度は対流で決まる。Case G ではヒーター壁平均温度がわずか **65°C** となり、実サウナのヒーター表面 (300-500°C) と大きく乖離。
+
+**対策**: `heater.wall_fixed_T` オプションを新設。ヒーター壁に `fixedValue T` を設定し、実ヒーター表面温度を模擬する放射サロゲートモデルを構築。
+
+### 12.4 計算結果
+
+**プローブ温度比較 (iter 30,000)**
+
+| Case | 設定 | upper [°C] | lower [°C] | floor [°C] | Vol-avg [°C] |
+|------|------|-----------|-----------|-----------|-------------|
+| B | 18kW vol, 放射なし | 108 | 68 | 31 | 83 |
+| C | 18kW vol + 換気 | 70 | -- | 20 | 43 |
+| E | PIMPLE + 換気 + kMin | 111 | -- | 30 | 79 |
+| G | 18kW vol + viewFactor | 129 | 84 | 46 | 100 |
+| H | 18kW vol + vF + fixedT 573K | 126 | 83 | 48 | 97 |
+| **I** | **13kW vol + vF + fixedT 573K** | **111** | **76** | **51** | **88** |
+| 実測 | -- | 80-100 | -- | -- | -- |
+
+**熱収支比較 (iter 30,000)**
+
+| Case | 総入熱 [W] | Wall loss [W] | Wall loss % | Imbalance % |
+|------|-----------|--------------|------------|------------|
+| B | 18,000 | -6,717 | 37% | 63% |
+| G | 18,000 | -10,281 | 57% | 43% |
+| H | 19,549 | -11,291 | 58% | 42% |
+| **I** | **14,570** | **-10,011** | **69%** | **31%** |
+
+### 12.5 物理的解釈
+
+1. **viewFactor の効果** (B→G): wall loss が 37→57% に増加 (+20%)。これは放射による壁面直接加熱。ただし volume_source のヒーター壁温度が低すぎるため、放射熱は壁間で再配分されるのみで、空気温度が上昇 (108→129°C)。
+
+2. **fixedT サロゲートの効果** (G→H): ヒーター壁 573K 固定により +1,549W の追加入熱。しかし volume_source 18kW と合わせて二重熱源となり、温度変化は微小。
+
+3. **入力分割の効果** (H→I): volume_source を 18→13kW に減らし、放射分 (~5kW) を fixedT 壁から供給。upper_bench が 126→111°C に低下、wall loss が 69% に増加し steady state に接近。
+
+4. **残存する上段高温の要因**:
+   - 壁厚 0.015m が薄い (実際 0.08m) → wall loss 不足
+   - 換気なし → 高温空気の排出経路なし
+   - steady state 未達 (imbalance 31%) → さらなる iteration で低下見込み
+
+### 12.6 新規ファイル
+
+| ファイル | 説明 |
+|---------|------|
+| `configs/cases/dry_sauna_steady_viewfactor.yaml` | Case G: viewFactor のみ |
+| `configs/cases/dry_sauna_steady_viewfactor_fixedT.yaml` | Case H: viewFactor + fixedT 573K (18kW) |
+| `configs/cases/dry_sauna_steady_viewfactor_split.yaml` | Case I: viewFactor + fixedT 573K (13kW split) |
+
+### 12.7 変更ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `foam_templates/base_case/system/blockMeshDict.j2` | viewFactorWall inGroups 追加 |
+| `foam_templates/base_case/constant/radiationProperties.j2` | dimensioned scalar, useDirectSolver true |
+| `foam_templates/base_case/0/qr.j2` | emissivityMode solidRadiation, heater_wall 特別処理削除 |
+| `foam_templates/base_case/system/fvSolution.j2` | qr/qrFinal ソルバー追加 |
+| `foam_templates/base_case/0/T.j2` | heater_wall_fixed_T 条件分岐追加 |
+| `src/harness/case_builder.py` | heater_wall_fixed_T コンテキスト変数 |
+| `configs/schemas/case_schema.json` | heater.wall_fixed_T スキーマ追加 |
+| `scripts/run_openfoam_wsl.sh` | faceAgglomerate + viewFactorsGen プリプロセス |
+| `scripts/run_case_d.sh` | faceAgglomerate + エラー検証 強化 |
+
+---
+
+## 13. 次のアクション (優先度順)
+
+### Priority A: 温度精度改善
+
+1. **Case I + 壁厚 0.08m**: wall loss 増加で upper_bench 低下見込み
+2. **Case I + 換気**: viewFactor + ventilation の組み合わせ
+3. **Case I extended (50k iter)**: steady state 接近度確認
+
+### Priority B: モデル改善
+
+4. **surface_flux + M1 mesh + viewFactor**: M1 でヒーター壁温が自然に高温化
+5. **ヒーター壁温度パラメトリック**: fixedT 473K, 573K, 673K 比較
+6. **buoyantPimpleFoam + viewFactor**: transient で wall thermal mass 効果
+
+### Priority C: 検証
+
+7. 実測データとの系統的比較 (温度プロファイル、成層化度合い)
+8. Grid independence study (M0 vs M1 with viewFactor)
+
+---
+
+## 14. 結語 (更新)
+
+**累積成果**
+- Heat balance auto-aggregation pipeline (14 tests)
+- Heater model A/B comparison framework (46 tests)
+- Transient buoyantPimpleFoam pipeline
+- kMin=0.01 乱流減衰防止
+- fvDOM 放射テンプレート (透明媒体では無効と判明)
+- **viewFactor 放射モデル完全動作** (coarse faces: 0 → 44)
+- **ヒーター壁温度 fixedT サロゲートモデル**
+- **入力分割モデル** (対流 13kW + 放射 ~5kW via fixedT)
+
+**現在のベスト結果** (Case I)
+- upper_bench: 111°C (実測 80-100°C, 差 11-31°C)
+- Wall loss: 69% (steady state 接近中)
+- 全 244 unit tests passing
+
+**残存ギャップの主因**
+1. 壁厚 0.015m (→ 0.08m で wall loss 増加)
+2. 換気なし (→ 追加で 10-16% の熱損失)
+3. Steady state 未達 (imbalance 31%)
+
+---
+
+**最終更新**: 2026-04-19
+**ハーネスバージョン**: SaunaFlow Phase 2+ (viewFactor Radiation)
 **計算ドメイン**: 3.0m × 2.5m × 2.5m ドライサウナ, 18kW electric heater
