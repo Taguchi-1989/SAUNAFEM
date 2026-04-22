@@ -1,0 +1,74 @@
+case:
+  name: parametric_L1_13kW_transient
+  description: "Case L-1: 13kW vol + viewFactor + fixedValue vent, buoyantPimpleFoam transient (3600s)"
+  type: transient
+
+geometry:
+  dimensions:
+    x: 3.0
+    y: 2.5
+    z: 2.5
+  mesh_level: M0
+
+boundary_conditions:
+  walls:
+    temperature: 293.15
+    type: mixed
+    model: lumped
+    thickness: 0.08
+    conductivity: 0.12
+    rho_cp: 500000
+  heater:
+    power_kw: 13.0
+    model: volume_source
+    depth: 0.3
+    position:
+      x: 0.0
+      y: 0.1
+      z: 1.25
+    width: 0.6
+    height: 0.5
+    wall_fixed_T: 573.15
+
+ventilation:
+  model: supply_exhaust
+  T_ambient: 293.15
+  supply:
+    height: 0.3
+    area: 0.01
+  exhaust:
+    height: 2.2
+    area: 0.015
+
+radiation:
+  model: viewFactor
+
+turbulence:
+  buoyancy_production: false
+
+solver:
+  name: buoyantPimpleFoam
+  end_time: 3600
+  delta_t: 0.01
+  max_delta_t: 1.0
+  write_interval: 60
+  averaging_start: 1800
+  uniform_init: true
+
+probes:
+  - name: upper_bench
+    position: { x: 1.5, y: 2.0, z: 1.25 }
+    fields: [T]
+  - name: lower_bench
+    position: { x: 1.5, y: 0.8, z: 1.25 }
+    fields: [T]
+  - name: floor_level
+    position: { x: 1.5, y: 0.1, z: 1.25 }
+    fields: [T]
+
+validation:
+  experimental_csv: "../../experiments/processed/dry_sauna_sample.csv"
+  tolerances:
+    upper_bench: 30.0
+    lower_bench: 30.0
+    floor_level: 30.0

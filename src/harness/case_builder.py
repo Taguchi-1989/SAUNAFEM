@@ -573,7 +573,7 @@ def build_case(case_yaml: Path, output_dir: Path | None = None) -> Path:
         "write_interval": write_interval,
         "delta_t": delta_t,
         "delta_t_initial": delta_t,
-        "max_delta_t": delta_t * 10,
+        "max_delta_t": solver.get("max_delta_t", delta_t * 10),
         "averaging_start": averaging_start,
         "probes": probes,
         "mixture_type": mixture_type,

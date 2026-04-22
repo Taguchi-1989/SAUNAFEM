@@ -133,6 +133,11 @@
           "exclusiveMinimum": 0,
           "description": "Time step for transient solvers [s]"
         },
+        "max_delta_t": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum time step for adjustTimeStep [s]"
+        },
         "averaging_start": {
           "type": "number",
           "minimum": 0,
