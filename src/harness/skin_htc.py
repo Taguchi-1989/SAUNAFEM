@@ -91,6 +91,10 @@ def saturation_pressure_kpa(t_c: float) -> float:
 _P_ATM_KPA = 101.325
 # Specific gas constant of dry air [J/(kg·K)]
 _R_DRY_AIR = 287.05
+# Latent heat of water vaporisation at 100 °C [J/kg]
+LATENT_HEAT_VAPORIZATION = 2.26e6
+# Du Bois average human body surface area [m²]
+BODY_SURFACE_AREA_M2 = 1.8
 
 
 def humidity_ratio_from_rh(rh: float, t_air_c: float) -> float:
@@ -109,6 +113,16 @@ def rh_from_humidity_ratio(humidity_ratio: float, t_air_c: float) -> float:
     p_vapor = humidity_ratio * _P_ATM_KPA / (0.622 + humidity_ratio)
     p_sat = saturation_pressure_kpa(t_air_c)
     return min(p_vapor / p_sat, 1.0) if p_sat > 0 else 0.0
+
+
+def latent_energy_in_water(water_kg: float) -> float:
+    """Latent heat content of ``water_kg`` evaporating fully and re-condensing [J].
+
+    A 100 mL ladle of water carries ~226 kJ of phase-change energy: that is
+    the upper bound of how much heat one löyly pour can deliver to whatever
+    surfaces (skin, walls) the resulting steam condenses on.
+    """
+    return max(water_kg, 0.0) * LATENT_HEAT_VAPORIZATION
 
 
 def humidity_ratio_from_water_addition(

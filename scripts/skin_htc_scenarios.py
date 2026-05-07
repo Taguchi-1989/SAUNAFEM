@@ -50,13 +50,20 @@ class SaunaType:
     volume_m3: float         # room volume for löyly humidity calc [m³]
 
 
-# Canonical sauna types (rough but realistic)
+# Canonical sauna types (rough but realistic).  Two Japanese well-known
+# venues are included: Shikiji's herbal sauna (低温高湿度・薬草スチーム) and
+# a generic "Kagaya-style" progressive löyly room used for the timeseries
+# study — its baseline is conservative, the magic happens over time.
 SAUNA_TYPES: list[SaunaType] = [
     SaunaType("Finnish dry",     90.0, 0.05,  95.0, 0.10, 2.5, 10.0),
     SaunaType("Russian banya",   65.0, 0.30,  68.0, 0.10, 1.5,  8.0),
     SaunaType("German Aufguss",  85.0, 0.08,  90.0, 0.10, 3.0, 15.0),
     SaunaType("Japanese rock",   65.0, 0.15,  75.0, 0.10, 1.0, 10.0),
     SaunaType("Turkish hammam",  45.0, 0.95,  46.0, 0.10, 0.5, 12.0),
+    # Shikiji 薬草サウナ (Shizuoka): ~60°C steam-saturated herbal mist, calm
+    SaunaType("Shikiji herbal",  60.0, 0.95,  62.0, 0.10, 0.3,  6.0),
+    # Kagaya-style progressive: hot dry baseline, intense löyly events
+    SaunaType("Kagaya prog.",    88.0, 0.10,  98.0, 0.10, 2.0, 12.0),
 ]
 
 
