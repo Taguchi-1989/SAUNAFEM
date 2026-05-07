@@ -12,6 +12,9 @@ from harness.skin_htc import (
     h_convective,
     h_evaporative,
     h_radiative,
+    humidity_ratio_from_rh,
+    humidity_ratio_from_water_addition,
+    rh_from_humidity_ratio,
     saturation_pressure_kpa,
     sweep_grid,
 )
@@ -189,6 +192,60 @@ def test_t_operative_between_t_air_and_t_mrt():
     bal = compute_skin_balance(t_air_c=80.0, rh=0.3, v_local=0.5, t_mrt_c=110.0)
     for part in bal.parts.values():
         assert 80.0 - 1e-6 <= part.t_operative_c <= 110.0 + 1e-6
+
+
+# ---------------------------------------------------------------------------
+# Humidity / water addition helpers
+# ---------------------------------------------------------------------------
+
+
+def test_rh_humidity_ratio_round_trip():
+    # Round-trip RH → w → RH
+    for t in [25.0, 60.0, 80.0, 100.0]:
+        for rh in [0.05, 0.30, 0.60, 0.90]:
+            w = humidity_ratio_from_rh(rh, t)
+            rh_back = rh_from_humidity_ratio(w, t)
+            assert rh_back == pytest.approx(rh, abs=0.01)
+
+
+def test_humidity_ratio_zero_for_zero_rh():
+    assert humidity_ratio_from_rh(0.0, 80.0) == 0.0
+    assert rh_from_humidity_ratio(0.0, 80.0) == 0.0
+
+
+def test_water_addition_one_ladle_in_typical_sauna():
+    # 1 ladle = 100 g into a 10 m³ sauna at 80°C
+    # m_dry ≈ ρ * V = (101.325e3 / (287.05 * 353.15)) * 10 ≈ 9.99 kg
+    # → w_added ≈ 0.1 / 9.99 ≈ 0.01 kg/kg = 10 g/kg
+    w = humidity_ratio_from_water_addition(
+        water_kg=0.1, sauna_volume_m3=10.0, t_air_c=80.0,
+    )
+    assert 0.009 < w < 0.011
+
+
+def test_water_addition_resulting_rh_at_80c():
+    # 100 g water in 10 m³ at 80°C → about 3% RH (rough check)
+    w = humidity_ratio_from_water_addition(0.1, 10.0, 80.0)
+    rh = rh_from_humidity_ratio(w, 80.0)
+    assert 0.02 < rh < 0.05
+
+
+def test_water_addition_two_ladles_double_humidity():
+    w1 = humidity_ratio_from_water_addition(0.1, 10.0, 80.0)
+    w2 = humidity_ratio_from_water_addition(0.2, 10.0, 80.0)
+    assert w2 == pytest.approx(2.0 * w1, rel=1e-9)
+
+
+def test_water_addition_with_initial_humidity():
+    w0 = humidity_ratio_from_rh(0.10, 80.0)  # baseline 10% RH
+    w_after = humidity_ratio_from_water_addition(
+        0.1, 10.0, 80.0, initial_humidity_ratio=w0,
+    )
+    assert w_after > w0
+
+
+def test_water_addition_zero_volume_safe():
+    assert humidity_ratio_from_water_addition(0.1, 0.0, 80.0) == 0.0
 
 
 # ---------------------------------------------------------------------------

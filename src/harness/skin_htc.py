@@ -87,6 +87,55 @@ def saturation_pressure_kpa(t_c: float) -> float:
     return 0.61078 * np.exp(17.27 * t_c / (t_c + 237.3))
 
 
+# Atmospheric pressure used for humidity-ratio / RH conversions [kPa]
+_P_ATM_KPA = 101.325
+# Specific gas constant of dry air [J/(kg·K)]
+_R_DRY_AIR = 287.05
+
+
+def humidity_ratio_from_rh(rh: float, t_air_c: float) -> float:
+    """Humidity ratio [kg vapor / kg dry air] from RH at given air temperature."""
+    if rh <= 0:
+        return 0.0
+    p_sat = saturation_pressure_kpa(t_air_c)
+    p_vapor = min(rh, 1.0) * p_sat
+    return 0.622 * p_vapor / max(_P_ATM_KPA - p_vapor, 1e-6)
+
+
+def rh_from_humidity_ratio(humidity_ratio: float, t_air_c: float) -> float:
+    """Relative humidity [0-1] from humidity ratio at given air temperature."""
+    if humidity_ratio <= 0:
+        return 0.0
+    p_vapor = humidity_ratio * _P_ATM_KPA / (0.622 + humidity_ratio)
+    p_sat = saturation_pressure_kpa(t_air_c)
+    return min(p_vapor / p_sat, 1.0) if p_sat > 0 else 0.0
+
+
+def humidity_ratio_from_water_addition(
+    water_kg: float,
+    sauna_volume_m3: float,
+    t_air_c: float,
+    initial_humidity_ratio: float = 0.0,
+) -> float:
+    """Well-mixed humidity ratio after evaporating ``water_kg`` of water into a
+    sauna of volume ``sauna_volume_m3`` at ``t_air_c``.
+
+    Assumes the room is fully mixed and atmospheric pressure stays constant
+    (i.e. the small extra vapor mass leaks out via vents on the timescale
+    we care about; we just track moisture content).
+
+    1 standard ladle ≈ 100 mL ≈ 0.1 kg water.
+    """
+    if sauna_volume_m3 <= 0:
+        return initial_humidity_ratio
+    t_k = t_air_c + 273.15
+    rho_dry = (_P_ATM_KPA * 1000.0) / (_R_DRY_AIR * t_k)  # kg/m³
+    m_dry = rho_dry * sauna_volume_m3
+    if m_dry <= 1e-9:
+        return initial_humidity_ratio
+    return initial_humidity_ratio + max(water_kg, 0.0) / m_dry
+
+
 def h_convective(
     v_local: float,
     t_air_c: float,
