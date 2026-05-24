@@ -211,4 +211,4 @@ Issueで質問・提案を歓迎します。サウナ設計、建築熱環境、
 
 ---
 
-*Apache License 2.0 — Copyright 2026 Taguchi*
+*Apache License 2.0 — Copyright 2026 ZEAL-BOOT-CAMP*
