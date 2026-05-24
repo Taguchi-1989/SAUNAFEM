@@ -85,8 +85,9 @@
   <div class="sub">作成日: 2026-05-14 ／ 作者: <span style="color:#ffb96b; font-weight:600;">ZEAL-BOOT-CAMP</span></div>
 </div>
 <div class="tabs">
-  <button class="tab-btn active" data-tab="sim">シミュレータ</button>
-  <button class="tab-btn" data-tab="logic">計算ロジック</button>
+  <button class="tab-btn active" data-tab="sim" data-i18n-tab="sim">シミュレータ</button>
+  <button class="tab-btn" data-tab="logic" data-i18n-tab="logic">計算ロジック</button>
+  <button id="langBtn" style="margin-left:auto;background:none;border:1px solid #555;color:#ffb96b;padding:3px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">EN</button>
 </div>
 <div class="tab-panels">
 
@@ -128,7 +129,7 @@
       <input type="range" id="Tw" min="20" max="100" step="1" value="70">
     </div>
     <hr style="border-color:#333; margin:14px 0">
-    <div style="font-size:11px; color:#999; margin-bottom:8px">— 熱流束（肌側）—</div>
+    <div data-i18n="skinSec" style="font-size:11px; color:#999; margin-bottom:8px">— 熱流束（肌側）—</div>
     <div class="control">
       <label>肌温度 T_skin <span style="color:#888;font-size:10px">(目安: 34–36)</span> <span class="val"><span id="tsVal">35</span> °C</span></label>
       <input type="range" id="Ts" min="28" max="40" step="0.5" value="35">
@@ -151,7 +152,7 @@
     </div>
 
     <details>
-      <summary>計算式・前提（出典リンク付き）</summary>
+      <summary data-i18n="details">計算式・前提（出典リンク付き）</summary>
       <ul style="padding-left:18px; margin:6px 0; line-height:1.6;">
         <li>飽和蒸気圧: Tetens式 e_s=611.2·exp(17.67T/(T+243.5)) Pa<br>
           → <a href="https://doi.org/10.1175/1520-0493(1980)108%3C1046:TCOEPT%3E2.0.CO;2" target="_blank" style="color:#80b8ff">Bolton, MWR (1980)</a></li>
@@ -187,7 +188,7 @@
     <div style="height:220px"><canvas id="chartQ"></canvas></div>
     <div style="height:200px; margin-top:10px"><canvas id="chartT"></canvas></div>
     <div style="height:200px; margin-top:10px"><canvas id="chartRH"></canvas></div>
-    <div class="note">※ 0次元集中定数モデル。上下成層は無視。CFD/実測でキャリブレーション係数を後付けする想定。</div>
+    <div class="note" data-i18n="note">※ 0次元集中定数モデル。上下成層は無視。CFD/実測でキャリブレーション係数を後付けする想定。</div>
   </div>
   </div><!-- /right-scroll -->
 </div><!-- /sim-wrap -->
@@ -209,12 +210,8 @@
   </div>
   <div class="flowcol">
     <div class="panel">
-      <h2>図 A — 依存グラフ（何が何に効くか）</h2>
-      <div class="cap">
-        スライダー（橙）→ 派生量（灰）→ 出力（青）。エッジに依存の関数形を記載。
-        例: V を上げると <code>m_air ∝ V</code> で熱容量 <code>mCp</code> が大きくなり、
-        温度時定数 <code>τ_T = mCp/(K_v+K_w)</code> が増えて応答が鈍る。
-      </div>
+      <h2 data-i18n="figA">図 A — 依存グラフ（何が何に効くか）</h2>
+      <div class="cap" data-i18n="figAcap">スライダー（橙）→ 派生量（灰）→ 出力（青）。エッジに依存の関数形を記載。例: V を上げると <code>m_air ∝ V</code> で熱容量 <code>mCp</code> が大きくなり、温度時定数 <code>τ_T = mCp/(K_v+K_w)</code> が増えて応答が鈍る。</div>
 <pre class="mermaid">
 flowchart LR
   classDef inp fill:#3a2a18,stroke:#ffb96b,color:#ffb96b,stroke-width:1.5px;
@@ -308,12 +305,8 @@ flowchart LR
     </div>
 
     <div class="panel">
-      <h2>図 B — 1タイムステップの解き順（逐次）</h2>
-      <div class="cap">
-        dt = 0.5 s、t = 0〜300 s。各ステップで既知 (T_c, w) から新しい (T_c, w) を逐次更新。
-        温度更新は <b>半陰解法</b>（分母に <code>1+dt·(K_v+K_w)/mCp</code>）で大きい dt でも安定。
-        蒸発潜熱はストーンが供給する前提で、空気からは奪わない（凝縮分のみ空気に戻る）。
-      </div>
+      <h2 data-i18n="figB">図 B — 1タイムステップの解き順（逐次）</h2>
+      <div class="cap" data-i18n="figBcap">dt = 0.5 s、t = 0〜300 s。各ステップで既知 (T_c, w) から新しい (T_c, w) を逐次更新。温度更新は <b>半陰解法</b>（分母に <code>1+dt·(K_v+K_w)/mCp</code>）で大きい dt でも安定。蒸発潜熱はストーンが供給する前提で、空気からは奪わない（凝縮分のみ空気に戻る）。</div>
 <pre class="mermaid">
 flowchart TD
   classDef step fill:#262626,stroke:#888,color:#ddd,text-align:left;
@@ -331,7 +324,7 @@ flowchart TD
   S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
   S7 -.->|"i &lt; N"| S0
 </pre>
-      <div class="cap" style="margin-top:8px">
+      <div class="cap" data-i18n="figBtips" style="margin-top:8px">
         <b>読み方のコツ:</b>
         <br>• <b>応答の速さ</b>を知りたい → 図 A の <code>τ_T</code> 経路（V↑ で鈍く、ACH↑/壁面積↑ で速い）
         <br>• <b>到達温度</b>を知りたい → 図 A の <code>T_eq</code> 経路（Q_h↑ で上、ACH↑ で下に引っ張る）
@@ -347,14 +340,80 @@ flowchart TD
 </div><!-- /tab-panels -->
 
 <script>
-// ── タブ切り替え ──
-document.querySelectorAll('.tab-btn').forEach(btn => {
+// ── グローバル言語フラグ ──
+var LANG = 'ja';
+
+// ── 翻訳データ（第2スクリプトより前に定義してTDZを回避） ──
+var I18N = {
+  ja: {
+    title: 'SaunaFlow — ロウリュ体感温度シミュレータ (0次元・室内平均)',
+    tab: { sim: 'シミュレータ', logic: '計算ロジック' },
+    sliders: {
+      V:    ['室容積 V','目安: 6–10','m³'], T0:   ['初期気温 T₀','目安: 80–95','°C'],
+      RH0:  ['初期相対湿度 RH₀','目安: 5–15','%'], mw: ['ロウリュ水量 (1杯)','目安: 50–150','ml'],
+      tev:  ['蒸発時間','目安: 10–20','秒'], Qh: ['ヒーター出力','目安: 4–8','kW'],
+      ACH:  ['換気率 ACH','目安: 1–3','回/h'], Tw: ['壁面温度 (結露判定用)','目安: 60–80','°C'],
+      Ts:   ['肌温度 T_skin','目安: 34–36','°C'], vAir: ['風速 v','0.1静止 / 1扇ぎ / 3Aufguss','m/s'],
+      hc:   ['対流伝達率 h_c','目安: 4–8','W/m²K'], Tr: ['放射壁温 T_rad','目安: 80–120','°C'],
+    },
+    skinSec:'— 熱流束（肌側）—', hcAuto:'h_c を風速から自動計算 (Mitchell:',
+    terms:['グラフの用語:','対流 q_conv','放射 q_rad','潜熱 q_lat','体感 Humidex'],
+    note:'※ 0次元集中定数モデル。上下成層は無視。CFD/実測でキャリブレーション係数を後付けする想定。',
+    details:'計算式・前提（出典リンク付き）',
+    kpi:{ peakQ:'熱流束ピーク q_total', condensHeat:'潜熱：凝縮加熱', evapCool:'潜熱：汗蒸発冷却', tPeak:'熱流束ピーク時刻', rhPeak:'RHピーク', dew:'露点温度', humidex:'体感(Humidex)' },
+    ch:{ conv:'対流 q_conv', rad:'放射 q_rad', lat:'潜熱 q_lat', tot:'合計 q_total', tAir:'気温 T [°C]', tHum:'体感温度 (Humidex) [°C]', rh:'相対湿度 RH [%]', ah:'絶対湿度 [g/kg]', xAx:'時間 [s]', yQ:'肌側熱流束 [W/m²]', yT:'温度 [°C]', yRH:'RH [%]', yAH:'絶対湿度 [g/kg]' },
+    figA:'図 A — 依存グラフ（何が何に効くか）',
+    figAcap:'スライダー（橙）→ 派生量（灰）→ 出力（青）。エッジに依存の関数形を記載。例: V を上げると <code>m_air ∝ V</code> で熱容量 <code>mCp</code> が大きくなり、温度時定数 <code>τ_T = mCp/(K_v+K_w)</code> が増えて応答が鈍る。',
+    figB:'図 B — 1タイムステップの解き順（逐次）',
+    figBcap:'dt = 0.5 s、t = 0〜300 s。各ステップで既知 (T_c, w) から新しい (T_c, w) を逐次更新。温度更新は <b>半陰解法</b>（分母に <code>1+dt·(K_v+K_w)/mCp</code>）で大きい dt でも安定。蒸発潜熱はストーンが供給する前提で、空気からは奪わない（凝縮分のみ空気に戻る）。',
+    figBtips:'<b>読み方のコツ:</b><br>• <b>応答の速さ</b>を知りたい → 図 A の <code>τ_T</code> 経路（V↑ で鈍く、ACH↑/壁面積↑ で速い）<br>• <b>到達温度</b>を知りたい → 図 A の <code>T_eq</code> 経路（Q_h↑ で上、ACH↑ で下に引っ張る）<br>• <b>RH ピーク</b>のタイミング → ② で水蒸気が増え、③ で T_c が上がると e_sat が指数で増えて RH は下がる ⇒ 投入直後にピーク<br>• <b>放射の効き方</b>は <code>T_r⁴</code> で非常に強い。T_s=35℃ 基準で T_r を 90→120℃ にすると q_rad は約 <code>(393⁴−308⁴)/(363⁴−308⁴) ≈ 1.78</code> 倍に跳ねる',
+  },
+  en: {
+    title: 'SaunaFlow — Löyly Thermal Sensation Simulator (0D / Room Average)',
+    tab: { sim: 'Simulator', logic: 'Calc Logic' },
+    sliders: {
+      V:    ['Room Volume V','typical: 6–10','m³'], T0: ['Initial Temp T₀','typical: 80–95','°C'],
+      RH0:  ['Initial Humidity RH₀','typical: 5–15','%'], mw: ['Löyly Water (1 throw)','typical: 50–150','ml'],
+      tev:  ['Evaporation Time','typical: 10–20','s'], Qh: ['Heater Power','typical: 4–8','kW'],
+      ACH:  ['Ventilation ACH','typical: 1–3','/h'], Tw: ['Wall Temp (dew check)','typical: 60–80','°C'],
+      Ts:   ['Skin Temp T_skin','typical: 34–36','°C'], vAir: ['Air Speed v','0.1 still / 1 fan / 3 Aufguss','m/s'],
+      hc:   ['Conv. Coeff h_c','typical: 4–8','W/m²K'], Tr: ['Radiation Wall T_rad','typical: 80–120','°C'],
+    },
+    skinSec:'— Skin Heat Flux —', hcAuto:'Auto h_c from v (Mitchell:',
+    terms:['Chart legend:','Convection q_conv','Radiation q_rad','Latent q_lat','Humidex'],
+    note:'※ 0D lumped model. Vertical stratification ignored. Calibration coefficients to be fitted against CFD/measurements.',
+    details:'Equations & assumptions (with references)',
+    kpi:{ peakQ:'Peak Heat Flux q_total', condensHeat:'Latent: condensation', evapCool:'Latent: sweat evap.', tPeak:'Peak flux time', rhPeak:'Peak RH', dew:'Dew point', humidex:'Humidex' },
+    ch:{ conv:'Convection q_conv', rad:'Radiation q_rad', lat:'Latent q_lat', tot:'Total q_total', tAir:'Air Temp T [°C]', tHum:'Humidex [°C]', rh:'Relative Humidity [%]', ah:'Abs. Humidity [g/kg]', xAx:'Time [s]', yQ:'Skin heat flux [W/m²]', yT:'Temperature [°C]', yRH:'RH [%]', yAH:'Abs. Humidity [g/kg]' },
+    figA:'Fig A — Dependency Graph (what drives what)',
+    figAcap:'Sliders (orange) → derived quantities (grey) → outputs (blue). Edge labels show functional form. Example: increasing V raises <code>m_air ∝ V</code>, hence thermal mass <code>mCp</code>, slowing the temperature response via time constant <code>τ_T = mCp/(K_v+K_w)</code>.',
+    figB:'Fig B — Time-step solution order (sequential)',
+    figBcap:'dt = 0.5 s, t = 0–300 s. Each step updates (T_c, w) sequentially. Temperature uses a <b>semi-implicit scheme</b> (denominator: <code>1+dt·(K_v+K_w)/mCp</code>) for stability at large dt. Evaporation latent heat is supplied by the stones, not drawn from air.',
+    figBtips:'<b>Reading guide:</b><br>• <b>Response speed</b> → Fig A <code>τ_T</code> path (larger V = slower; higher ACH / wall area = faster)<br>• <b>Steady-state temp</b> → Fig A <code>T_eq</code> path (Q_h↑ raises; ACH↑ pulls down)<br>• <b>RH peak timing</b> → Step ② adds vapour; when T_c rises in ③, e_sat grows exponentially and RH drops ⇒ peak right after löyly throw<br>• <b>Radiation</b>: <code>T_r⁴</code> is highly nonlinear. Raising T_r 90→120°C (T_s=35°C) multiplies q_rad by ≈<code>(393⁴−308⁴)/(363⁴−308⁴) ≈ 1.78×</code>',
+  },
+};
+
+// ── タブ切り替え + Mermaid遅延初期化 ──
+var mermaidReady = false;
+document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'logic' && !mermaidReady) {
+      mermaidReady = true;
+      // display:none→flexの変更がレイアウトに反映されてからrender
+      setTimeout(() =>
+        mermaid.run({ nodes: document.querySelectorAll('.mermaid') })
+      , 50);
+    }
   });
+});
+
+// ── 言語ボタン ──
+document.getElementById('langBtn').addEventListener('click', () => {
+  if (typeof setLang === 'function') setLang(LANG === 'ja' ? 'en' : 'ja');
 });
 </script>
 
@@ -568,19 +627,17 @@ function update() {
   const cls = r.condensRisk ? 'warn' : (dH > 5 ? 'ok' : '');
 
   const qcls = r.peakQ > 1500 ? 'warn' : (r.peakQ > 800 ? 'ok' : '');
-  // 潜熱の支配モード: 凝縮(加熱)/蒸発(冷却)
-  const latLabel = r.latMax > Math.abs(r.latMin)
-    ? `潜熱：凝縮加熱`
-    : `潜熱：汗蒸発冷却`;
+  const kpi = I18N[LANG].kpi;
+  const latLabel = r.latMax > Math.abs(r.latMin) ? kpi.condensHeat : kpi.evapCool;
   const latVal = r.latMax > Math.abs(r.latMin) ? r.latMax : r.latMin;
   const latCls = latVal > 500 ? 'warn' : (latVal < -100 ? 'ok' : '');
   $('kpis').innerHTML =
-    fmtKPI('熱流束ピーク q_total', r.peakQ.toFixed(0), 'W/m²', qcls) +
+    fmtKPI(kpi.peakQ, r.peakQ.toFixed(0), 'W/m²', qcls) +
     fmtKPI(latLabel, (latVal>=0?'+':'') + latVal.toFixed(0), 'W/m²', latCls) +
-    fmtKPI('熱流束ピーク時刻', r.tPeakQ.toFixed(0), 's') +
-    fmtKPI('RHピーク', r.peakRH.toFixed(0), '%', r.peakRH>=100?'warn':'') +
-    fmtKPI('露点温度', r.Td.toFixed(1), '°C', r.condensRisk?'warn':'') +
-    fmtKPI('体感(Humidex)', r.peakH.toFixed(0), '°C');
+    fmtKPI(kpi.tPeak, r.tPeakQ.toFixed(0), 's') +
+    fmtKPI(kpi.rhPeak, r.peakRH.toFixed(0), '%', r.peakRH>=100?'warn':'') +
+    fmtKPI(kpi.dew, r.Td.toFixed(1), '°C', r.condensRisk?'warn':'') +
+    fmtKPI(kpi.humidex, r.peakH.toFixed(0), '°C');
 }
 
 ids.forEach(id => $(id).addEventListener('input', update));
@@ -737,9 +794,108 @@ document.addEventListener('click', e => {
 $('popClose').addEventListener('click', hidePop);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePop(); });
 
+
+// ── 言語切り替え関数 ──
+function setLang(lang) {
+  LANG = lang;
+  document.documentElement.lang = lang;
+  const t = I18N[lang];
+  const sliderIds = ['V','T0','RH0','mw','tev','Qh','ACH','Tw','Ts','vAir','hc','Tr'];
+
+  // タイトル
+  document.querySelector('h1').textContent = t.title;
+
+  // タブボタン
+  document.querySelectorAll('.tab-btn[data-i18n-tab]').forEach(b =>
+    b.textContent = t.tab[b.dataset.i18nTab]
+  );
+  document.getElementById('langBtn').textContent = lang === 'ja' ? 'EN' : '日本語';
+
+  // スライダーラベル
+  sliderIds.forEach(id => {
+    const [lbl, hint, unit] = t.sliders[id];
+    const input = document.getElementById(id);
+    const ctrl = input.closest('.control');
+    const label = ctrl.querySelector('label');
+    if (label.childNodes[0] && label.childNodes[0].nodeType === 3)
+      label.childNodes[0].textContent = lbl + ' ';
+    const hintSpan = label.querySelector('span[style*="888"]');
+    if (hintSpan) hintSpan.textContent = '(' + hint + ')';
+    const valSpan = label.querySelector('.val');
+    if (valSpan && valSpan.lastChild && valSpan.lastChild.nodeType === 3)
+      valSpan.lastChild.textContent = ' ' + unit;
+  });
+
+  // vAir チェックボックスラベル
+  const vDrivesLabel = document.querySelector('label[for="vDrivesHc"], label:has(#vDrivesHc)');
+  if (!vDrivesLabel) {
+    // has()非対応ブラウザ向け
+    const cb = document.getElementById('vDrivesHc');
+    if (cb) {
+      const lbl = cb.closest('label') || cb.parentElement.querySelector('label');
+      if (lbl && lbl.childNodes) {
+        [...lbl.childNodes].filter(n=>n.nodeType===3).forEach((n,i)=>{
+          if(i===0) n.textContent = ' ' + t.hcAuto + ' ';
+        });
+      }
+    }
+  }
+
+  // スキンセクション区切り・note・details
+  ['skinSec','note','details'].forEach(key => {
+    document.querySelectorAll(`[data-i18n="${key}"]`).forEach(el =>
+      el.textContent = t[key]
+    );
+  });
+
+  // ターム凡例 (data-i18n=figA etc.)
+  ['figA','figAcap','figB','figBcap','figBtips'].forEach(key => {
+    document.querySelectorAll(`[data-i18n="${key}"]`).forEach(el =>
+      el.innerHTML = t[key]
+    );
+  });
+
+  // ターム凡例バー
+  const tb = document.querySelector('.termbar');
+  if (tb) {
+    const lbl = tb.querySelector('.label');
+    if (lbl) lbl.textContent = t.terms[0];
+    tb.querySelectorAll('.term').forEach((span, i) => {
+      const textNode = [...span.childNodes].find(n => n.nodeType === 3);
+      if (textNode) textNode.textContent = t.terms[i+1] + ' ';
+    });
+  }
+
+  // チャートラベル更新
+  if (typeof chartQ !== 'undefined' && chartQ) {
+    const ch = t.ch;
+    chartQ.data.datasets[0].label = ch.conv;
+    chartQ.data.datasets[1].label = ch.rad;
+    chartQ.data.datasets[2].label = ch.lat;
+    chartQ.data.datasets[3].label = ch.tot;
+    chartQ.options.scales.x.title.text = ch.xAx;
+    chartQ.options.scales.y.title.text = ch.yQ;
+    chartQ.update('none');
+    chartT.data.datasets[0].label = ch.tAir;
+    chartT.data.datasets[1].label = ch.tHum;
+    chartT.options.scales.x.title.text = ch.xAx;
+    chartT.options.scales.y.title.text = ch.yT;
+    chartT.update('none');
+    chartRH.data.datasets[0].label = ch.rh;
+    chartRH.data.datasets[1].label = ch.ah;
+    chartRH.options.scales.x.title.text = ch.xAx;
+    chartRH.options.scales.y.title.text = ch.yRH;
+    chartRH.options.scales.y2.title.text = ch.yAH;
+    chartRH.update('none');
+  }
+
+  // KPI再描画
+  update();
+}
+
 // Mermaid (dark theme)
 mermaid.initialize({
-  startOnLoad: true,
+  startOnLoad: false,
   theme: 'dark',
   themeVariables: {
     fontSize: '12px',
