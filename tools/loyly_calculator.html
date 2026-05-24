@@ -435,6 +435,11 @@ var I18N = {
   },
 };
 
+// ── mermaidソースを描画前に保存（SVG挿入後は textContent が消えるため） ──
+document.querySelectorAll('pre.mermaid').forEach(n => {
+  n.dataset.mSrc = n.textContent;
+});
+
 // ── タブ切り替え + Mermaid遅延初期化 ──
 var mermaidRendered = {};
 document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
@@ -459,28 +464,38 @@ document.getElementById('langBtn').addEventListener('click', () => {
 });
 
 // ── 印刷ボタン ──
-// 全パネルを一時表示 → mermaid再レンダリング（display:none状態では0pxになるため）→ print → 復元
 document.getElementById('printBtn').addEventListener('click', () => {
   const panes = [...document.querySelectorAll('.tab-pane')];
+  const restore = () => panes.forEach(p => p.style.removeProperty('display'));
+
+  // 全パネルを表示してレイアウトを確定させる
   panes.forEach(p => p.style.setProperty('display', 'block', 'important'));
 
-  const mNodes = [...document.querySelectorAll('.mermaid')];
-  // 既存SVGを削除してサイズを正しく再計算させる
-  mNodes.forEach(n => {
-    n.removeAttribute('data-processed');
-    const s = n.querySelector('svg'); if (s) s.remove();
-  });
-  Object.keys(mermaidRendered).forEach(k => delete mermaidRendered[k]);
-
   setTimeout(() => {
-    mermaid.run({ nodes: mNodes }).then(() => {
-      window.print();
-      panes.forEach(p => p.style.removeProperty('display'));
+    const mNodes = [...document.querySelectorAll('pre.mermaid')];
+    // SVGが存在しない or 高さ0（display:none描画）のノードだけ再描画
+    const toRender = mNodes.filter(n => {
+      const svg = n.querySelector('svg');
+      return !svg || svg.getBoundingClientRect().height === 0;
     });
+
+    const doRender = () => {
+      toRender.forEach(n => {
+        n.removeAttribute('data-processed');
+        const s = n.querySelector('svg'); if (s) s.remove();
+        // 保存済みソースを復元（SVG挿入後はtextContentが失われるため）
+        if (n.dataset.mSrc) n.textContent = n.dataset.mSrc;
+      });
+      return mermaid.run({ nodes: toRender });
+    };
+
+    (toRender.length > 0 ? doRender() : Promise.resolve())
+      .then(() => { window.print(); restore(); })
+      .catch(e => { console.error('mermaid print error', e); restore(); });
   }, 60);
 });
 
-// Ctrl+P: 全パネルを表示だけする（mermaid再レンダリングは非同期のため印刷ボタン推奨）
+// Ctrl+P: 全パネルを表示（mermaidは同期レンダリング不可のため印刷ボタン推奨）
 window.addEventListener('beforeprint', () => {
   document.querySelectorAll('.tab-pane').forEach(p => p.style.setProperty('display', 'block', 'important'));
 });
