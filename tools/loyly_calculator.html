@@ -69,6 +69,40 @@
   .termbar .label { color:#999; }
   .termbar .term { display:inline-flex; align-items:center; gap:4px; }
   .termbar .swatch { width:10px; height:10px; border-radius:2px; display:inline-block; }
+  /* ── 印刷 ── */
+  @media print {
+    html, body { height:auto !important; overflow:visible !important; background:#fff; color:#111; }
+    .hdr { padding:10px 16px 4px; }
+    h1 { color:#b05000; font-size:15px; }
+    .sub { color:#555; }
+    .tabs { display:none !important; }
+    .popover, .info-btn { display:none !important; }
+    .tab-panels { height:auto !important; overflow:visible !important; display:block !important; }
+    .tab-pane { display:block !important; height:auto !important; overflow:visible !important; break-inside:avoid-column; }
+    /* ページ1: 入力条件 */
+    .sim-wrap { display:block !important; height:auto !important; overflow:visible !important; padding:0 16px; }
+    .left-scroll { overflow:visible !important; height:auto !important; break-after:page; }
+    /* ページ2: 計算結果 */
+    .right-scroll { overflow:visible !important; height:auto !important; }
+    /* ページ3: 計算ロジック */
+    #pane-logic { break-before:page; }
+    .logic-wrap { overflow:visible !important; height:auto !important; }
+    .flowcol { grid-template-columns:1fr 1fr; }
+    /* パネル・チャート */
+    .panel { background:#fff !important; border:1px solid #ccc; border-radius:4px; }
+    .kpi { background:#f5f5f5 !important; border-radius:3px; }
+    .kpi .lbl { color:#555; }
+    .kpi .num { color:#b05000; }
+    .kpi .unit { color:#666; }
+    .warn { background:#fee !important; }
+    .warn .num { color:#c00 !important; }
+    .ok .num { color:#060 !important; }
+    .mermaid { background:#fafafa !important; }
+    .flowwrap h2 { color:#b05000; }
+    .flowwrap .cap { color:#444; }
+    canvas { max-width:100% !important; }
+    details[open] summary::after { content:''; }
+  }
 </style>
 </head>
 <body style="display:flex; flex-direction:column;">
@@ -88,6 +122,7 @@
   <button class="tab-btn active" data-tab="sim" data-i18n-tab="sim">シミュレータ</button>
   <button class="tab-btn" data-tab="logic" data-i18n-tab="logic">計算ロジック</button>
   <button id="langBtn" style="margin-left:auto;background:none;border:1px solid #555;color:#ffb96b;padding:3px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">EN</button>
+  <button id="printBtn" style="margin-left:8px;background:none;border:1px solid #555;color:#ccc;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:13px;" title="印刷 / Print">🖨</button>
 </div>
 <div class="tab-panels">
 
@@ -414,6 +449,24 @@ document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
 // ── 言語ボタン ──
 document.getElementById('langBtn').addEventListener('click', () => {
   if (typeof setLang === 'function') setLang(LANG === 'ja' ? 'en' : 'ja');
+});
+
+// ── 印刷ボタン ──
+function ensureMermaidThenPrint() {
+  if (!mermaidReady) {
+    mermaidReady = true;
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') }).then(() => window.print());
+  } else {
+    window.print();
+  }
+}
+document.getElementById('printBtn').addEventListener('click', ensureMermaidThenPrint);
+// Ctrl+P でも mermaid を事前レンダリング
+window.addEventListener('beforeprint', () => {
+  if (!mermaidReady) {
+    mermaidReady = true;
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+  }
 });
 </script>
 
