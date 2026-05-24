@@ -464,35 +464,42 @@ document.getElementById('langBtn').addEventListener('click', () => {
 });
 
 // ── 印刷ボタン ──
-document.getElementById('printBtn').addEventListener('click', () => {
+// mermaid.render(id, src) 低レベルAPIでSVGを直接生成 → display:none問題を回避
+document.getElementById('printBtn').addEventListener('click', async () => {
   const panes = [...document.querySelectorAll('.tab-pane')];
   const restore = () => panes.forEach(p => p.style.removeProperty('display'));
 
-  // 全パネルを表示してレイアウトを確定させる
   panes.forEach(p => p.style.setProperty('display', 'block', 'important'));
+  await new Promise(r => setTimeout(r, 60));
 
-  setTimeout(() => {
+  try {
+    const ts = Date.now();
     const mNodes = [...document.querySelectorAll('pre.mermaid')];
-    // SVGが存在しない or 高さ0（display:none描画）のノードだけ再描画
-    const toRender = mNodes.filter(n => {
-      const svg = n.querySelector('svg');
-      return !svg || svg.getBoundingClientRect().height === 0;
-    });
-
-    const doRender = () => {
-      toRender.forEach(n => {
-        n.removeAttribute('data-processed');
-        const s = n.querySelector('svg'); if (s) s.remove();
-        // 保存済みソースを復元（SVG挿入後はtextContentが失われるため）
-        if (n.dataset.mSrc) n.textContent = n.dataset.mSrc;
-      });
-      return mermaid.run({ nodes: toRender });
-    };
-
-    (toRender.length > 0 ? doRender() : Promise.resolve())
-      .then(() => { window.print(); restore(); })
-      .catch(e => { console.error('mermaid print error', e); restore(); });
-  }, 60);
+    for (let i = 0; i < mNodes.length; i++) {
+      const n = mNodes[i];
+      const src = n.dataset.mSrc;
+      if (!src) continue;
+      // 高さ0 or SVGなし → 再描画
+      const existing = n.querySelector('svg');
+      if (existing && existing.getBoundingClientRect().height > 10) continue;
+      const { svg } = await mermaid.render('mprint-' + ts + '-' + i, src);
+      n.innerHTML = svg;
+      // viewBox を保持したうえで width:100% にしてページ幅にフィット
+      const svgEl = n.querySelector('svg');
+      if (svgEl) {
+        const w = svgEl.getAttribute('width'), h = svgEl.getAttribute('height');
+        if (w && h && !svgEl.getAttribute('viewBox'))
+          svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        svgEl.setAttribute('width', '100%');
+        svgEl.removeAttribute('height');
+      }
+    }
+    window.print();
+  } catch(e) {
+    console.error('print error:', e);
+    window.print();
+  }
+  restore();
 });
 
 // Ctrl+P: 全パネルを表示（mermaidは同期レンダリング不可のため印刷ボタン推奨）
