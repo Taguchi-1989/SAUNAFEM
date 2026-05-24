@@ -84,10 +84,9 @@
     .left-scroll { overflow:visible !important; height:auto !important; break-after:page; }
     /* ページ2: 計算結果 */
     .right-scroll { overflow:visible !important; height:auto !important; }
-    /* ページ3: 計算ロジック */
-    #pane-logic { break-before:page; }
+    /* ページ3・4: 依存グラフ / 計算ステップ */
+    #pane-dep, #pane-step { break-before:page; }
     .logic-wrap { overflow:visible !important; height:auto !important; }
-    .flowcol { grid-template-columns:1fr 1fr; }
     /* パネル・チャート */
     .panel { background:#fff !important; border:1px solid #ccc; border-radius:4px; }
     .kpi { background:#f5f5f5 !important; border-radius:3px; }
@@ -120,7 +119,8 @@
 </div>
 <div class="tabs">
   <button class="tab-btn active" data-tab="sim" data-i18n-tab="sim">シミュレータ</button>
-  <button class="tab-btn" data-tab="logic" data-i18n-tab="logic">計算ロジック</button>
+  <button class="tab-btn" data-tab="dep" data-i18n-tab="dep">依存グラフ</button>
+  <button class="tab-btn" data-tab="step" data-i18n-tab="step">計算ステップ</button>
   <button id="langBtn" style="margin-left:auto;background:none;border:1px solid #555;color:#ffb96b;padding:3px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">EN</button>
   <button id="printBtn" style="margin-left:8px;background:none;border:1px solid #555;color:#ccc;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:13px;" title="印刷 / Print">🖨</button>
 </div>
@@ -229,8 +229,8 @@
 </div><!-- /sim-wrap -->
 </div><!-- /pane-sim -->
 
-<!-- ===== タブ2: 計算ロジック ===== -->
-<div class="tab-pane" id="pane-logic">
+<!-- ===== タブ2: 依存グラフ ===== -->
+<div class="tab-pane" id="pane-dep">
 <div class="logic-wrap">
 <div class="flowwrap">
   <div class="legend">
@@ -243,10 +243,9 @@
     <span><code>∝exp(X)</code> 指数</span>
     <span><code>線形差</code> ΔX に比例</span>
   </div>
-  <div class="flowcol">
-    <div class="panel">
-      <h2 data-i18n="figA">図 A — 依存グラフ（何が何に効くか）</h2>
-      <div class="cap" data-i18n="figAcap">スライダー（橙）→ 派生量（灰）→ 出力（青）。エッジに依存の関数形を記載。例: V を上げると <code>m_air ∝ V</code> で熱容量 <code>mCp</code> が大きくなり、温度時定数 <code>τ_T = mCp/(K_v+K_w)</code> が増えて応答が鈍る。</div>
+  <div class="panel">
+    <h2 data-i18n="figA">図 A — 依存グラフ（何が何に効くか）</h2>
+    <div class="cap" data-i18n="figAcap">スライダー（橙）→ 派生量（灰）→ 出力（青）。エッジに依存の関数形を記載。例: V を上げると <code>m_air ∝ V</code> で熱容量 <code>mCp</code> が大きくなり、温度時定数 <code>τ_T = mCp/(K_v+K_w)</code> が増えて応答が鈍る。</div>
 <pre class="mermaid">
 flowchart LR
   classDef inp fill:#3a2a18,stroke:#ffb96b,color:#ffb96b,stroke-width:1.5px;
@@ -337,11 +336,18 @@ flowchart LR
   qrad --> qtot
   qlat --> qtot
 </pre>
-    </div>
+  </div>
+</div><!-- /flowwrap -->
+</div><!-- /logic-wrap -->
+</div><!-- /pane-dep -->
 
-    <div class="panel">
-      <h2 data-i18n="figB">図 B — 1タイムステップの解き順（逐次）</h2>
-      <div class="cap" data-i18n="figBcap">dt = 0.5 s、t = 0〜300 s。各ステップで既知 (T_c, w) から新しい (T_c, w) を逐次更新。温度更新は <b>半陰解法</b>（分母に <code>1+dt·(K_v+K_w)/mCp</code>）で大きい dt でも安定。蒸発潜熱はストーンが供給する前提で、空気からは奪わない（凝縮分のみ空気に戻る）。</div>
+<!-- ===== タブ3: 計算ステップ ===== -->
+<div class="tab-pane" id="pane-step">
+<div class="logic-wrap">
+<div class="flowwrap">
+  <div class="panel">
+    <h2 data-i18n="figB">図 B — 1タイムステップの解き順（逐次）</h2>
+    <div class="cap" data-i18n="figBcap">dt = 0.5 s、t = 0〜300 s。各ステップで既知 (T_c, w) から新しい (T_c, w) を逐次更新。温度更新は <b>半陰解法</b>（分母に <code>1+dt·(K_v+K_w)/mCp</code>）で大きい dt でも安定。蒸発潜熱はストーンが供給する前提で、空気からは奪わない（凝縮分のみ空気に戻る）。</div>
 <pre class="mermaid">
 flowchart TD
   classDef step fill:#262626,stroke:#888,color:#ddd,text-align:left;
@@ -359,18 +365,17 @@ flowchart TD
   S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
   S7 -.->|"i &lt; N"| S0
 </pre>
-      <div class="cap" data-i18n="figBtips" style="margin-top:8px">
-        <b>読み方のコツ:</b>
-        <br>• <b>応答の速さ</b>を知りたい → 図 A の <code>τ_T</code> 経路（V↑ で鈍く、ACH↑/壁面積↑ で速い）
-        <br>• <b>到達温度</b>を知りたい → 図 A の <code>T_eq</code> 経路（Q_h↑ で上、ACH↑ で下に引っ張る）
-        <br>• <b>RH ピーク</b>のタイミング → ② で水蒸気が増え、③ で T_c が上がると e_sat が指数で増えて RH は下がる ⇒ 投入直後にピーク
-        <br>• <b>放射の効き方</b>は <code>T_r⁴</code> で非常に強い。T_s=35℃ 基準で T_r を 90→120℃ にすると q_rad は約 <code>(393⁴−308⁴)/(363⁴−308⁴) ≈ 1.78</code> 倍に跳ねる
-      </div>
+    <div class="cap" data-i18n="figBtips" style="margin-top:8px">
+      <b>読み方のコツ:</b>
+      <br>• <b>応答の速さ</b>を知りたい → 図 A の <code>τ_T</code> 経路（V↑ で鈍く、ACH↑/壁面積↑ で速い）
+      <br>• <b>到達温度</b>を知りたい → 図 A の <code>T_eq</code> 経路（Q_h↑ で上、ACH↑ で下に引っ張る）
+      <br>• <b>RH ピーク</b>のタイミング → ② で水蒸気が増え、③ で T_c が上がると e_sat が指数で増えて RH は下がる ⇒ 投入直後にピーク
+      <br>• <b>放射の効き方</b>は <code>T_r⁴</code> で非常に強い。T_s=35℃ 基準で T_r を 90→120℃ にすると q_rad は約 <code>(393⁴−308⁴)/(363⁴−308⁴) ≈ 1.78</code> 倍に跳ねる
     </div>
   </div>
 </div><!-- /flowwrap -->
 </div><!-- /logic-wrap -->
-</div><!-- /pane-logic -->
+</div><!-- /pane-step -->
 
 </div><!-- /tab-panels -->
 
@@ -382,7 +387,7 @@ var LANG = 'ja';
 var I18N = {
   ja: {
     title: 'SaunaFlow — ロウリュ体感温度シミュレータ (0次元・室内平均)',
-    tab: { sim: 'シミュレータ', logic: '計算ロジック' },
+    tab: { sim: 'シミュレータ', dep: '依存グラフ', step: '計算ステップ' },
     sliders: {
       V:    ['室容積 V','目安: 6–10','m³'], T0:   ['初期気温 T₀','目安: 80–95','°C'],
       RH0:  ['初期相対湿度 RH₀','目安: 5–15','%'], mw: ['ロウリュ水量 (1杯)','目安: 50–150','ml'],
@@ -405,7 +410,7 @@ var I18N = {
   },
   en: {
     title: 'SaunaFlow — Löyly Thermal Sensation Simulator (0D / Room Average)',
-    tab: { sim: 'Simulator', logic: 'Calc Logic' },
+    tab: { sim: 'Simulator', dep: 'Dep. Graph', step: 'Calc Steps' },
     sliders: {
       V:    ['Room Volume V','typical: 6–10','m³'], T0: ['Initial Temp T₀','typical: 80–95','°C'],
       RH0:  ['Initial Humidity RH₀','typical: 5–15','%'], mw: ['Löyly Water (1 throw)','typical: 50–150','ml'],
@@ -429,18 +434,18 @@ var I18N = {
 };
 
 // ── タブ切り替え + Mermaid遅延初期化 ──
-var mermaidReady = false;
+var mermaidRendered = {};
 document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'logic' && !mermaidReady) {
-      mermaidReady = true;
-      // display:none→flexの変更がレイアウトに反映されてからrender
+    const pane = document.getElementById('pane-' + btn.dataset.tab);
+    pane.classList.add('active');
+    if ((btn.dataset.tab === 'dep' || btn.dataset.tab === 'step') && !mermaidRendered[btn.dataset.tab]) {
+      mermaidRendered[btn.dataset.tab] = true;
       setTimeout(() =>
-        mermaid.run({ nodes: document.querySelectorAll('.mermaid') })
+        mermaid.run({ nodes: pane.querySelectorAll('.mermaid') })
       , 50);
     }
   });
@@ -453,9 +458,10 @@ document.getElementById('langBtn').addEventListener('click', () => {
 
 // ── 印刷ボタン ──
 function ensureMermaidThenPrint() {
-  if (!mermaidReady) {
-    mermaidReady = true;
-    mermaid.run({ nodes: document.querySelectorAll('.mermaid') }).then(() => window.print());
+  const nodes = document.querySelectorAll('.mermaid');
+  const hasUnrendered = [...nodes].some(n => !n.querySelector('svg'));
+  if (hasUnrendered) {
+    mermaid.run({ nodes }).then(() => window.print());
   } else {
     window.print();
   }
@@ -463,10 +469,9 @@ function ensureMermaidThenPrint() {
 document.getElementById('printBtn').addEventListener('click', ensureMermaidThenPrint);
 // Ctrl+P でも mermaid を事前レンダリング
 window.addEventListener('beforeprint', () => {
-  if (!mermaidReady) {
-    mermaidReady = true;
-    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
-  }
+  const nodes = document.querySelectorAll('.mermaid');
+  const unrendered = [...nodes].filter(n => !n.querySelector('svg'));
+  if (unrendered.length > 0) mermaid.run({ nodes: unrendered });
 });
 </script>
 
